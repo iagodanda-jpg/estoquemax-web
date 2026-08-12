@@ -1,1 +1,10 @@
-{"version":2,"routes":[{"src":"/api/config","dest":"/api/config.js"},{"src":"/master","dest":"/master.html"},{"src":"/vendedoras","dest":"/vendedoras.html"},{"src":"/","dest":"/index.html"}]}
+{
+  "version": 2,
+  "routes": [
+    { "src": "/api/config", "dest": "/api/config.js" },
+    { "src": "/api/create-vendedora", "dest": "/api/create-vendedora.js" },
+    { "src": "/master", "dest": "/master.html", "headers": { "Cache-Control": "no-cache, must-revalidate" } },
+    { "src": "/vendedoras", "dest": "/vendedoras.html", "headers": { "Cache-Control": "no-cache, must-revalidate" } },
+    { "src": "/", "dest": "/index.html", "headers": { "Cache-Control": "no-cache, must-revalidate" } }
+  ]
+}
