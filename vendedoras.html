@@ -120,6 +120,26 @@
           </div>
         </div>
 
+        <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--sub);cursor:pointer;margin-bottom:10px">
+          <input type="checkbox" id="vdividir" onchange="toggleDividir()"> Dividir em duas formas de pagamento
+        </label>
+        <div class="maq" id="blocomaq2" style="background:#F0FDF4;border-color:#BBF7D0">
+          <div class="maq-titulo" style="color:#166534">2ª Forma de Pagamento</div>
+          <div class="row2" style="margin-bottom:8px">
+            <select id="vp2" onchange="onPgto2Change()">
+              <option>Dinheiro</option><option>PIX</option><option>Pix Maquininha</option>
+              <option>Cartão Débito</option><option>Cartão Crédito</option><option>Link de Pagamento</option>
+              <option>Boleto</option><option>Parcelado</option>
+            </select>
+            <input id="vvalor2" type="number" min="0" step="0.01" placeholder="Valor desta forma" oninput="calcT()">
+          </div>
+          <div class="row2" id="blocomaq2band" style="display:none">
+            <select id="vband2" onchange="calcTaxaMaq2()"><option value="">Selecione...</option><option value="mastercard">Mastercard</option><option value="visa">Visa</option><option value="elo">Elo</option><option value="amex">Amex</option></select>
+            <select id="vparc2"><option value="">Parcelas</option></select>
+          </div>
+          <div style="font-size:12px;color:#166534;margin-top:6px">Valor restante na 1ª forma: <b id="vvalor1restante">R$ 0,00</b></div>
+        </div>
+
         <div style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;margin:12px 0 8px">Entrega (opcional)</div>
         <div class="fi"><label>Rua / Avenida</label><input id="vrua" placeholder="Endereço"></div>
         <div class="row3">
@@ -230,6 +250,37 @@ function calcTaxaMaq(){
   popularParcelas(pgto, bandeira, document.getElementById('vparc'));
   calcT();
 }
+function toggleDividir(){
+  const dividir=document.getElementById('vdividir').checked;
+  document.getElementById('blocomaq2').style.display=dividir?'block':'none';
+  if(dividir){ document.getElementById('vp2').value='Dinheiro'; onPgto2Change(); }
+  else document.getElementById('vvalor2').value='';
+  calcT();
+}
+function onPgto2Change(){
+  const pgto=document.getElementById('vp2').value;
+  const wrap=document.getElementById('blocomaq2band');
+  const selBand=document.getElementById('vband2');
+  const selParc=document.getElementById('vparc2');
+  const usaMaq=['Pix Maquininha','Cartão Débito','Cartão Crédito','Parcelado','Link de Pagamento'].includes(pgto);
+  const isLink=pgto==='Link de Pagamento', isPix=pgto==='Pix Maquininha', isDebito=pgto==='Cartão Débito';
+  wrap.style.display=usaMaq?'grid':'none';
+  if(usaMaq){
+    if(isLink){
+      selBand.innerHTML='<option value="link">Link</option>'; selBand.disabled=true; selParc.disabled=false;
+      selParc.innerHTML='<option value="">Parcelas</option>'+Object.entries(TAXAS_STONE.link).map(([n,t])=>`<option value="${n}">${n==='1'?'1x':n+'x'} — ${t.toFixed(2).replace('.',',')}%</option>`).join('');
+    } else if(isPix){
+      selBand.innerHTML='<option value="pix">Pix</option>'; selBand.disabled=true;
+      selParc.innerHTML='<option value="1">À vista</option>'; selParc.disabled=true;
+    } else {
+      selBand.disabled=false;
+      const bands = isDebito ? [['mastercard','Mastercard'],['visa','Visa'],['elo','Elo']] : [['mastercard','Mastercard'],['visa','Visa'],['elo','Elo'],['amex','Amex']];
+      selBand.innerHTML='<option value="">Selecione...</option>'+bands.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+      popularParcelas(pgto, selBand.value, selParc);
+    }
+  }
+  calcT();
+}
 
 // ─── NAVEGAÇÃO ────────────────────────────────────────────────────────────────
 function ir(id){
@@ -294,19 +345,33 @@ function calcT(){
   const total=Math.max(0,subtotal-descValor);
   document.getElementById('rsub').textContent=fR(subtotal);
   document.getElementById('rt').textContent=fR(total);
+
+  const dividir=document.getElementById('vdividir')?.checked;
+  const valor2Raw=dividir?Number(document.getElementById('vvalor2')?.value||0):0;
+  const valor2=Math.min(Math.max(0,valor2Raw),total);
+  const valor1=total-valor2;
+  const restanteEl=document.getElementById('vvalor1restante');
+  if(restanteEl) restanteEl.textContent=fR(valor1);
+
   const pgto=document.getElementById('vp')?.value||'';
   const bandeira=document.getElementById('vband')?.value||'';
   const parcelas=document.getElementById('vparc')?.value||'1';
   const usaMaq=['Pix Maquininha','Cartão Débito','Cartão Crédito','Parcelado','Link de Pagamento'].includes(pgto);
   const resumo=document.getElementById('resumotaxa');
-  if(usaMaq && total>0 && (bandeira||pgto==='Pix Maquininha'||pgto==='Link de Pagamento')){
+  if(usaMaq && valor1>0 && (bandeira||pgto==='Pix Maquininha'||pgto==='Link de Pagamento')){
     const taxaPct=getTaxaPct(pgto, pgto==='Pix Maquininha'?'pix':pgto==='Link de Pagamento'?'link':bandeira, parcelas);
-    const taxaValor=total*(taxaPct/100), liquido=total-taxaValor;
+    const taxaValor=valor1*(taxaPct/100), liquido=valor1-taxaValor;
     resumo.style.display='block';
     document.getElementById('txpct').textContent=taxaPct.toFixed(2).replace('.',',')+'%';
     document.getElementById('txval').textContent='-'+fR(taxaValor);
     document.getElementById('txliq').textContent=fR(liquido);
   } else resumo.style.display='none';
+}
+function calcTaxaMaq2(){
+  const pgto=document.getElementById('vp2').value;
+  const bandeira=document.getElementById('vband2').value;
+  popularParcelas(pgto, bandeira, document.getElementById('vparc2'));
+  calcT();
 }
 function rI(){
   document.getElementById('il').innerHTML=it.map((i,idx)=>`<div style="display:grid;grid-template-columns:1fr 55px 30px;gap:6px;margin-bottom:8px;align-items:center">
@@ -334,9 +399,24 @@ async function reg(){
   const pgto=document.getElementById('vp').value;
   const bandeira=document.getElementById('vband')?.value||'';
   const parcelas=document.getElementById('vparc')?.value||'';
+  const dividir=document.getElementById('vdividir')?.checked;
+  const valor2Raw=dividir?Number(document.getElementById('vvalor2')?.value||0):0;
+  const valor2=Math.min(Math.max(0,valor2Raw),total);
+  const valor1=total-valor2;
   const usaMaq=['Pix Maquininha','Cartão Débito','Cartão Crédito','Parcelado','Link de Pagamento'].includes(pgto);
   const taxaPct=usaMaq?getTaxaPct(pgto, pgto==='Pix Maquininha'?'pix':pgto==='Link de Pagamento'?'link':bandeira, parcelas):0;
-  const taxaValor=total*(taxaPct/100);
+  const taxaValor=valor1*(taxaPct/100);
+  let pgto2='', bandeira2='', parcelas2='', taxaPct2=0, taxaValor2=0;
+  if(dividir && valor2>0){
+    pgto2=document.getElementById('vp2').value;
+    bandeira2=document.getElementById('vband2')?.value||'';
+    parcelas2=document.getElementById('vparc2')?.value||'';
+    const usaMaq2=['Pix Maquininha','Cartão Débito','Cartão Crédito','Parcelado','Link de Pagamento'].includes(pgto2);
+    taxaPct2=usaMaq2?getTaxaPct(pgto2, pgto2==='Pix Maquininha'?'pix':pgto2==='Link de Pagamento'?'link':bandeira2, parcelas2):0;
+    taxaValor2=valor2*(taxaPct2/100);
+    bandeira2=usaMaq2?bandeira2:''; parcelas2=usaMaq2?parcelas2:'';
+  }
+  const valorLiquido=(valor1-taxaValor)+(valor2-taxaValor2);
   const previsaoISO=document.getElementById('vpr').value||null;
   const endRua=document.getElementById('vrua').value, endNum=document.getElementById('vnum').value;
   const endCidade=document.getElementById('vcid').value, endEstado=document.getElementById('vuf').value.toUpperCase();
@@ -345,7 +425,8 @@ async function reg(){
     end_rua:endRua, end_num:endNum, end_cidade:endCidade, end_estado:endEstado,
     itens:its, subtotal, desconto:descValor, desconto_raw:descRaw, desconto_modo:descModo,
     total, pgto, bandeira:usaMaq?bandeira:'', parcelas:usaMaq?String(parcelas):null,
-    taxa_pct:usaMaq?taxaPct:0, taxa_valor:usaMaq?taxaValor:0, valor_liquido:usaMaq?(total-taxaValor):total,
+    taxa_pct:usaMaq?taxaPct:0, taxa_valor:usaMaq?taxaValor:0, valor_liquido:valorLiquido,
+    pgto2:(dividir&&valor2>0)?pgto2:'', bandeira2, parcelas2, taxa_pct2:taxaPct2, taxa_valor2:taxaValor2, valor2:(dividir?valor2:0),
     pgto_recebido:'nao', vendedora_id:vid||null, perfil_vendedora_id:pid,
     status:'pendente', previsao_iso:previsaoISO, obs:document.getElementById('vo').value,
     data_venda:new Date().toISOString().slice(0,10)
@@ -362,8 +443,10 @@ async function reg(){
   }
   alert('Venda registrada!');
   it=[{id:'',n:'',q:1,p:0}];
-  ['vc','vtel','vrua','vnum','vcid','vuf','vo','vdesc'].forEach(id=>document.getElementById(id).value='');
+  ['vc','vtel','vrua','vnum','vcid','vuf','vo','vdesc','vvalor2'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('vpr').value='';
+  document.getElementById('vdividir').checked=false;
+  document.getElementById('blocomaq2').style.display='none';
   btn.textContent='Registrar Venda'; btn.disabled=false;
   ir('i');
 }
