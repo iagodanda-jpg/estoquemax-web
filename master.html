@@ -2258,8 +2258,10 @@ async function salvarVenda(){
     if(entregaLigada){
       const endCompleto=[endRua,endNum,endCidade,endEstado].filter(Boolean).join(', ');
       const itensTxt = itensFiltrados.map(i=>i.qtd+'x '+i.nome).join(', ');
-      const {error:errSync} = await sb.from('entregas').update({ cliente, end_completo:endCompleto, itens:itensTxt }).eq('id',entregaLigada.id);
-      if(!errSync) entregas = entregas.map(e=>e.id===entregaLigada.id?{...e,cliente,end:endCompleto,itens:itensTxt}:e);
+      const syncPatch = { cliente, end_completo:endCompleto, itens:itensTxt };
+      if(previsaoISO) syncPatch.data_entrega = previsaoISO;
+      const {error:errSync} = await sb.from('entregas').update(syncPatch).eq('id',entregaLigada.id);
+      if(!errSync) entregas = entregas.map(e=>e.id===entregaLigada.id?{...e,cliente,end:endCompleto,itens:itensTxt,dataISO:previsaoISO||e.dataISO,data:previsaoISO?fmtDataBR(previsaoISO):e.data}:e);
     }
   }
   btn.disabled=false;

@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>EstoqueMax Vendedoras</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   :root{ --azul:#1E4D8C; --verde:#1A7A4A; --vm:#B91C1C; --am:#B45309; --fundo:#F0F4F8; --borda:#D1D9E6; --txt:#1A2540; --sub:#5A6A8A; }
@@ -147,7 +149,16 @@
           <div class="fi" style="margin-bottom:0"><label>Cidade</label><input id="vcid" placeholder="Cidade"></div>
           <div class="fi" style="margin-bottom:0"><label>UF</label><input id="vuf" placeholder="UF" maxlength="2" style="text-transform:uppercase"></div>
         </div>
-        <div class="fi" style="margin-top:12px"><label>Previsão de Entrega</label><input id="vpr" type="date"></div>
+        <div class="fi" style="margin-top:12px"><label>Previsão de Entrega</label><input id="vpr" type="date" onchange="destacarDiaCalendario()"></div>
+        <div class="ca" style="padding:12px;margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <button type="button" onclick="navCalVend(-1)" style="background:none;border:1.5px solid var(--borda);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px">◀</button>
+            <span id="cal-vend-label" style="font-weight:700;font-size:12.5px"></span>
+            <button type="button" onclick="navCalVend(1)" style="background:none;border:1.5px solid var(--borda);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px">▶</button>
+          </div>
+          <div id="cal-vend" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px"></div>
+          <div style="font-size:10.5px;color:var(--sub);margin-top:6px;text-align:center">Toque num dia livre pra preencher a previsão</div>
+        </div>
         <div class="fi"><label>Obs</label><input id="vo" placeholder="Cor, tamanho..."></div>
 
         <div id="res" style="background:var(--fundo);border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:14px">
@@ -186,6 +197,22 @@
 <script>
 const SU='https://nuqnlzmmnrrodlalijrb.supabase.co';
 let sb, prods=[], it=[], oi=[], pid, vid, enm='Iago Estofados', emp={};
+let entregasVend=[], semanaOffsetVend=0;
+let empLogoBase64=null;
+async function carregarLogoBase64Vend(url){
+  if(!url) return null;
+  try{
+    const resp=await fetch(url);
+    if(!resp.ok) return null;
+    const blob=await resp.blob();
+    return await new Promise(resolve=>{
+      const reader=new FileReader();
+      reader.onload=()=>resolve(reader.result);
+      reader.onerror=()=>resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch(e){ return null; }
+}
 const fR=v=>'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const LB={pendente:'Pendente',confirmado:'Confirmado',entregue:'Entregue',cancelado:'Cancelado'};
 const CL={pendente:'#FEF9C3',confirmado:'#DBEAFE',entregue:'#DCFCE7',cancelado:'#FEE2E2'};
@@ -289,9 +316,41 @@ function ir(id){
   document.getElementById('ab-'+id).classList.add('at');
   if(id==='i') cD();
   if(id==='mv') cMV();
-  if(id==='nv'){ it=[{id:'',n:'',q:1,p:0}]; rI(); document.getElementById('vpr').min=new Date().toISOString().slice(0,10); }
+  if(id==='nv'){ it=[{id:'',n:'',q:1,p:0}]; rI(); document.getElementById('vpr').min=new Date().toISOString().slice(0,10); semanaOffsetVend=0; renderCalVend(); }
   if(id==='oc'){ oi=[{id:'',n:'',q:1,p:0}]; rO(); const v=new Date(); v.setDate(v.getDate()+7); document.getElementById('oval').value=v.toISOString().slice(0,10); }
 }
+
+// ─── CALENDÁRIO DE ENTREGAS (somente leitura) ─────────────────────────────────
+function renderCalVend(){
+  const wrap=document.getElementById('cal-vend'); if(!wrap) return;
+  const hoje2=new Date(); hoje2.setHours(0,0,0,0);
+  const inicioSemana=new Date(hoje2);
+  inicioSemana.setDate(hoje2.getDate()-hoje2.getDay()+semanaOffsetVend*7);
+  const dias=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const selecionado=document.getElementById('vpr')?.value||'';
+  let html='';
+  for(let d=0; d<7; d++){
+    const dia=new Date(inicioSemana); dia.setDate(inicioSemana.getDate()+d);
+    const diaISO=dia.toISOString().slice(0,10);
+    const passado = dia < hoje2;
+    const n = entregasVend.filter(e=>e.data_entrega===diaISO).length;
+    const isSel = diaISO===selecionado;
+    const cor = isSel ? '#1E4D8C' : n===0 ? '#D1D9E6' : n<3 ? '#F59E0B' : '#B91C1C';
+    const bg = isSel ? '#1E4D8C' : n===0 ? '#fff' : n<3 ? '#FEF9C3' : '#FEE2E2';
+    const txtCor = isSel ? '#fff' : 'var(--txt)';
+    html += `<div ${passado?'':`onclick="selecionarDiaCal('${diaISO}')"`} style="background:${bg};border:1.5px solid ${cor};border-radius:8px;padding:6px 2px;text-align:center;${passado?'opacity:.4':'cursor:pointer'}">
+      <div style="font-size:9.5px;font-weight:700;color:${isSel?'#fff':'var(--sub)'}">${dias[d]}</div>
+      <div style="font-size:14px;font-weight:800;color:${txtCor}">${dia.getDate()}</div>
+      <div style="font-size:9px;color:${isSel?'#fff':cor};font-weight:700">${n>0?n+' entr.':'livre'}</div>
+    </div>`;
+  }
+  const fim=new Date(inicioSemana); fim.setDate(inicioSemana.getDate()+6);
+  document.getElementById('cal-vend-label').textContent = inicioSemana.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'})+' – '+fim.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'});
+  wrap.innerHTML=html;
+}
+function navCalVend(dir){ semanaOffsetVend+=dir; renderCalVend(); }
+function selecionarDiaCal(diaISO){ document.getElementById('vpr').value=diaISO; renderCalVend(); }
+function destacarDiaCalendario(){ renderCalVend(); }
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
 async function login(){
@@ -307,14 +366,19 @@ async function login(){
   if(v){ vid=v.id; document.getElementById('nu').textContent=v.nome.split(' ')[0]; }
   else document.getElementById('nu').textContent=p.nome.split(' ')[0];
   const {data:e}=await sb.from('empresa').select('*').eq('id',1).maybeSingle();
-  if(e){ emp=e; enm=e.nome||enm; document.getElementById('en').textContent=enm; }
+  if(e){ emp=e; enm=e.nome||enm; document.getElementById('en').textContent=enm; if(e.logo_url) empLogoBase64=await carregarLogoBase64Vend(e.logo_url); }
   const {data:prs}=await sb.from('produtos').select('id,nome,preco').eq('ativo',true).order('nome');
   prods=prs||[];
+  await carregarEntregasVend();
   document.getElementById('ls').style.display='none';
   document.getElementById('as').style.display='block';
   cD();
 }
 async function logout(){ await sb.auth.signOut(); location.reload(); }
+async function carregarEntregasVend(){
+  const {data}=await sb.from('entregas').select('data_entrega');
+  entregasVend = data||[];
+}
 
 // ─── INÍCIO / DASHBOARD ───────────────────────────────────────────────────────
 async function cD(){
@@ -440,15 +504,82 @@ async function reg(){
       entregador_id:null, data_entrega:previsaoISO, periodo:'Manhã', status:'agendado',
       obs:row.obs, venda_id:data.id
     });
+    entregasVend.push({data_entrega:previsaoISO});
   }
-  alert('Venda registrada!');
+  btn.textContent='Registrar Venda'; btn.disabled=false;
   it=[{id:'',n:'',q:1,p:0}];
   ['vc','vtel','vrua','vnum','vcid','vuf','vo','vdesc','vvalor2'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('vpr').value='';
   document.getElementById('vdividir').checked=false;
   document.getElementById('blocomaq2').style.display='none';
-  btn.textContent='Registrar Venda'; btn.disabled=false;
   ir('i');
+  await gerarPedidoPDF(data, its);
+}
+
+// ─── PDF DO PEDIDO ──────────────────────────────────────────────────────────
+async function gerarPedidoPDF(venda, its){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const W = 210;
+  doc.setFillColor(30,77,140); doc.rect(0,0,W,26,'F');
+  let textX = 14;
+  if(empLogoBase64){
+    try{
+      const fmt = empLogoBase64.includes('image/png') ? 'PNG' : empLogoBase64.includes('image/webp') ? 'WEBP' : 'JPEG';
+      doc.addImage(empLogoBase64, fmt, 14, 4, 18, 18);
+      textX = 36;
+    } catch(e){}
+  }
+  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(15);
+  doc.text(enm, textX, 12);
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  const sub2 = [emp.cnpj, emp.tel].filter(Boolean).join('  ·  ') || 'Controle de Estofados';
+  doc.text(sub2, textX, 18);
+  doc.setFontSize(8); doc.text('Emitido em '+new Date().toLocaleString('pt-BR'), textX, 23);
+
+  doc.setTextColor(30,40,64); doc.setFontSize(15); doc.setFont('helvetica','bold');
+  doc.text('Pedido / Confirmação de Venda #'+venda.id, 14, 36);
+
+  doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(30,40,64);
+  doc.text('Cliente: '+venda.cliente, 14, 46);
+  doc.setFont('helvetica','normal'); doc.setTextColor(90,106,138);
+  let y=52;
+  if(venda.tel){ doc.text('Telefone: '+venda.tel, 14, y); y+=6; }
+  const endTxt=[venda.end_rua,venda.end_num,venda.end_cidade,venda.end_estado].filter(Boolean).join(', ');
+  if(endTxt){ doc.text('Endereço: '+endTxt, 14, y); y+=6; }
+  if(venda.previsao_iso){ doc.text('Previsão de entrega: '+new Date(venda.previsao_iso+'T12:00:00').toLocaleDateString('pt-BR'), 14, y); y+=6; }
+  y+=4;
+
+  doc.autoTable({
+    startY:y, margin:{left:14,right:14},
+    head:[['Qtd','Produto','Preço','Subtotal']],
+    body: its.map(i=>[i.qtd, i.nome, fR(i.preco), fR(i.qtd*i.preco)]),
+    styles:{fontSize:10,cellPadding:4}, headStyles:{fillColor:[30,77,140],textColor:255,fontStyle:'bold'},
+    alternateRowStyles:{fillColor:[240,244,248]}
+  });
+  y = doc.lastAutoTable.finalY + 8;
+  if(venda.desconto>0){ doc.setFontSize(10); doc.setTextColor(185,28,28); doc.text('Desconto: -'+fR(venda.desconto), 14, y); y+=7; }
+  doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(26,122,74);
+  doc.text('Total: '+fR(venda.total), 14, y); y+=8;
+  doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.setTextColor(90,106,138);
+  const pgtoTxt = [venda.pgto, venda.pgto2].filter(Boolean).join(' + ');
+  doc.text('Forma de pagamento: '+pgtoTxt, 14, y); y+=6;
+  if(venda.obs){ doc.text('Observações: '+venda.obs, 14, y); y+=6; }
+
+  doc.setDrawColor(209,217,230); doc.setLineWidth(0.3); doc.line(14, 284, W-14, 284);
+  doc.setFontSize(7.5); doc.setTextColor(90,106,138);
+  doc.text(enm, 14, 289);
+  doc.text('Documento gerado pelo EstoqueMax', W-14, 289, {align:'right'});
+
+  const nomeArquivo = `pedido-${venda.id}-${(venda.cliente||'').replace(/[^a-zA-Z0-9]/g,'-')}.pdf`;
+  const blob = doc.output('blob');
+  if(navigator.canShare && navigator.canShare({files:[new File([blob], nomeArquivo, {type:'application/pdf'})]})){
+    try{
+      await navigator.share({ files:[new File([blob], nomeArquivo, {type:'application/pdf'})], title:'Pedido #'+venda.id, text:'Segue o pedido de '+venda.cliente });
+      return;
+    } catch(e){ /* usuário cancelou o compartilhamento, cai no download */ }
+  }
+  doc.save(nomeArquivo);
 }
 
 // ─── ORÇAMENTO ─────────────────────────────────────────────────────────────────
@@ -492,9 +623,10 @@ function gO(){
       if(v){ vid=v.id; document.getElementById('nu').textContent=v.nome.split(' ')[0]; }
       else document.getElementById('nu').textContent=p.nome.split(' ')[0];
       const {data:e}=await sb.from('empresa').select('*').eq('id',1).maybeSingle();
-      if(e){ emp=e; enm=e.nome||enm; document.getElementById('en').textContent=enm; }
+      if(e){ emp=e; enm=e.nome||enm; document.getElementById('en').textContent=enm; if(e.logo_url) empLogoBase64=await carregarLogoBase64Vend(e.logo_url); }
       const {data:prs}=await sb.from('produtos').select('id,nome,preco').eq('ativo',true).order('nome');
       prods=prs||[];
+      await carregarEntregasVend();
       document.getElementById('ls').style.display='none';
       document.getElementById('as').style.display='block';
       cD();
