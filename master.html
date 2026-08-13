@@ -655,11 +655,20 @@
       </div>
       <div style="color:var(--sub);font-size:13.5px">Todos os dados já são salvos automaticamente no banco (Supabase) a cada alteração. Use o backup abaixo como cópia extra de segurança.</div>
     </div>
-    <div class="card" style="border-left:5px solid var(--azul);max-width:420px">
-      <div style="margin-bottom:12px;color:var(--azul)"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
-      <div style="font-weight:700;font-size:16px;margin-bottom:6px">Exportar Backup</div>
-      <div style="color:var(--sub);font-size:13px;margin-bottom:16px">Baixa um arquivo <b>.json</b> com todos os dados atuais: produtos, matérias-primas, vendas, entregas, vendedoras, entregadores e movimentações.</div>
-      <button class="btn btn-primary" onclick="exportarBackup()" style="width:100%">Baixar Backup Agora</button>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;max-width:900px">
+      <div class="card" style="border-left:5px solid var(--azul)">
+        <div style="margin-bottom:12px;color:var(--azul)"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+        <div style="font-weight:700;font-size:16px;margin-bottom:6px">Exportar Backup</div>
+        <div style="color:var(--sub);font-size:13px;margin-bottom:16px">Baixa um arquivo <b>.json</b> com todos os dados atuais: produtos, matérias-primas, vendas, entregas, vendedoras, entregadores e movimentações.</div>
+        <button class="btn btn-primary" onclick="exportarBackup()" style="width:100%">Baixar Backup Agora</button>
+      </div>
+      <div class="card" style="border-left:5px solid var(--verde)">
+        <div style="margin-bottom:12px;color:var(--verde)"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+        <div style="font-weight:700;font-size:16px;margin-bottom:6px">Restaurar Backup Antigo</div>
+        <div style="color:var(--sub);font-size:13px;margin-bottom:16px">Importa um backup <b>.json</b> gerado pela versão local (localStorage) do EstoqueMax para o banco Supabase. Os itens são <b>adicionados</b> — não apaga nada que já existe. Use só uma vez, com o banco ainda vazio ou recém-começado, para não duplicar.</div>
+        <input type="file" id="input-backup" accept=".json" onchange="importarBackup(event)" style="display:none">
+        <button class="btn btn-success" onclick="document.getElementById('input-backup').click()" style="width:100%">Selecionar Arquivo de Backup</button>
+      </div>
     </div>
   </div>
 
@@ -2244,6 +2253,115 @@ function exportarBackup(){
   URL.revokeObjectURL(url);
   const btn=document.querySelector('#aba-backup .btn-primary');
   if(btn){ const orig=btn.textContent; btn.textContent='Backup baixado!'; setTimeout(()=>btn.textContent=orig,2500); }
+}
+
+// ─── BACKUP IMPORT (restaura backup antigo do localStorage para o Supabase) ──
+function brParaISO(dataBR){
+  if(!dataBR) return new Date().toISOString().slice(0,10);
+  const partes = String(dataBR).split('/');
+  if(partes.length!==3) return new Date().toISOString().slice(0,10);
+  const [dd,mm,yy] = partes;
+  return `${yy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+}
+function importarBackup(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e){
+    let d;
+    try { d = JSON.parse(e.target.result); }
+    catch(err){ alert('Arquivo inválido. Selecione um backup gerado pelo EstoqueMax.'); event.target.value=''; return; }
+    if(!d.produtos && !d.materias){ alert('Arquivo inválido. Selecione um backup gerado pelo EstoqueMax.'); event.target.value=''; return; }
+
+    const resumo = `Restaurar backup${d.exportadoEm?' de '+new Date(d.exportadoEm).toLocaleString('pt-BR'):''}?\n\n`
+      + `• ${(d.produtos||[]).length} produtos\n`
+      + `• ${(d.materias||[]).length} matérias-primas\n`
+      + `• ${(d.vendedoras||[]).length} vendedoras\n`
+      + `• ${(d.entregadores||[]).length} entregadores\n`
+      + `• ${(d.vendas||[]).length} vendas\n`
+      + `• ${(d.entregas||[]).length} entregas\n`
+      + `• ${(d.movimentacoes||[]).length} movimentações\n\n`
+      + `Os itens serão ADICIONADOS ao banco atual (nada é apagado). Use só se o banco estiver vazio ou recém-criado, para não duplicar. Continuar?`;
+    if(!confirm(resumo)){ event.target.value=''; return; }
+
+    const btn = document.querySelector('#aba-backup .btn-success');
+    if(btn){ btn.disabled=true; btn.textContent='Restaurando...'; }
+
+    try{
+      const prodIdMap = {}, mpIdMap = {}, vendIdMap = {}, entIdMap = {}, vendaIdMap = {};
+
+      if(d.empresa && d.empresa.nome && !empresa.nome){
+        const {data} = await sb.from('empresa').upsert({ id:1, nome:d.empresa.nome||'', cnpj:d.empresa.cnpj||'', tel:d.empresa.tel||'', email:d.empresa.email||'', endereco:d.empresa.end||'', slogan:d.empresa.slogan||'' }).select().single();
+        if(data) empresa = { nome:data.nome||'',cnpj:data.cnpj||'',tel:data.tel||'',email:data.email||'',end:data.endereco||'',slogan:data.slogan||'' };
+      }
+
+      for(const p of (d.produtos||[])){
+        const {data,error} = await sb.from('produtos').insert({ nome:p.nome, tipo:p.tipo, categoria:p.categoria||'', unidade:p.unidade||'un', qtd:Number(p.qtd)||0, minimo:Number(p.minimo)||0, custo:Number(p.custo)||0, preco:Number(p.preco)||0, promo:p.promo||null, ativo:true }).select().single();
+        if(!error) prodIdMap[p.id] = data.id;
+      }
+
+      for(const m of (d.materias||[])){
+        const {data,error} = await sb.from('materias_primas').insert({ nome:m.nome, categoria:m.categoria||'', unidade:m.unidade||'un', qtd:Number(m.qtd)||0, minimo:Number(m.minimo)||0, custo:Number(m.custo)||0, ativo:true }).select().single();
+        if(!error) mpIdMap[m.id] = data.id;
+      }
+
+      for(const v of (d.vendedoras||[])){
+        const {data,error} = await sb.from('vendedoras').insert({ nome:v.nome, tel:v.tel||'', email:v.email||'', comissao:Number(v.comissao)||0, ativo:true }).select().single();
+        if(!error) vendIdMap[v.id] = data.id;
+      }
+
+      for(const en of (d.entregadores||[])){
+        const {data,error} = await sb.from('entregadores').insert({ nome:en.nome, tel:en.tel||'', veiculo:en.veiculo||'', placa:en.placa||'', obs:en.obs||'', ativo:true }).select().single();
+        if(!error) entIdMap[en.id] = data.id;
+      }
+
+      for(const v of (d.vendas||[])){
+        const itensRemap = (v.itens||[]).map(i=>({ id: prodIdMap[i.prodId ?? i.id] || null, nome: i.nome, qtd: i.qtd, preco: i.preco })).filter(i=>i.id);
+        const row = {
+          cliente: v.cliente, tel: v.tel||'',
+          end_rua: v.endRua||'', end_num: v.endNum||'', end_cidade: v.endCidade||'', end_estado: v.endEstado||'',
+          itens: itensRemap, subtotal: Number(v.subtotal)||0, desconto: Number(v.desconto)||0,
+          desconto_raw: Number(v.descontoRaw)||0, desconto_modo: v.descontoModo||'R$', desconto_obs: v.descontoObs||'',
+          total: Number(v.total)||0, pgto: v.pgto||'', bandeira: v.bandeira||'', parcelas: v.parcelas?String(v.parcelas):null,
+          taxa_pct: Number(v.taxaPct)||0, taxa_valor: Number(v.taxaValor)||0, valor_liquido: Number(v.valorLiquido)||Number(v.total)||0,
+          pgto_recebido: v.pgtoRecebido||'nao', vendedora_id: vendIdMap[v.vendedoraId]||null, perfil_vendedora_id: null,
+          status: v.status||'pendente', previsao_iso: v.previsaoISO||null, obs: v.obs||'',
+          data_venda: v.dataISO || brParaISO(v.data)
+        };
+        const {data,error} = await sb.from('vendas').insert(row).select().single();
+        if(!error) vendaIdMap[v.id] = data.id;
+      }
+
+      for(const en of (d.entregas||[])){
+        await sb.from('entregas').insert({
+          cliente: en.cliente, end_completo: en.end||'', itens: en.itens||'',
+          entregador_id: entIdMap[en.entregadorId]||null, data_entrega: en.dataISO || brParaISO(en.data),
+          periodo: en.periodo||'Manhã', status: en.status||'agendado', obs: en.obs||'',
+          venda_id: vendaIdMap[en.vendaId]||null
+        });
+      }
+
+      for(const m of (d.movimentacoes||[])){
+        const novoItemId = m.tabela==='mp' ? mpIdMap[m.itemId] : prodIdMap[m.itemId];
+        if(!novoItemId) continue;
+        await sb.from('movimentacoes').insert({
+          tabela: m.tabela, tipo: m.tipo, item_id: novoItemId, nome_item: m.nomeItem, qtd: Number(m.qtd)||0,
+          motivo: m.motivo||'', pedido: m.pedido||null, perfil_id: masterUid, data_mov: brParaISO(m.data)
+        });
+      }
+
+      await carregarTudo();
+      aplicarEmpresaNoHeader(); popularSelectVendedoras(); popularSelectEntregadores();
+      renderDash(); renderProd(); renderMP(); renderMov(); renderAlertas(); renderVendas(); renderEntregas(); renderCalendario();
+      alert('Backup restaurado!\n\n' + (d.produtos||[]).length + ' produtos, ' + (d.materias||[]).length + ' matérias-primas, ' + (d.vendas||[]).length + ' vendas importadas.');
+      irAba('dashboard');
+    } catch(err){
+      alert('Erro ao restaurar: ' + err.message);
+    }
+    if(btn){ btn.disabled=false; btn.textContent='Selecionar Arquivo de Backup'; }
+    event.target.value='';
+  };
+  reader.readAsText(file);
 }
 
 // ─── PERÍODO DOS RELATÓRIOS ───────────────────────────────────────────────────
