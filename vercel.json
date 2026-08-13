@@ -3,6 +3,7 @@
   "routes": [
     { "src": "/api/config", "dest": "/api/config.js" },
     { "src": "/api/create-vendedora", "dest": "/api/create-vendedora.js" },
+    { "src": "/api/upload-logo", "dest": "/api/upload-logo.js" },
     { "src": "/master", "dest": "/master.html", "headers": { "Cache-Control": "no-cache, must-revalidate" } },
     { "src": "/vendedoras", "dest": "/vendedoras.html", "headers": { "Cache-Control": "no-cache, must-revalidate" } },
     { "src": "/", "dest": "/index.html", "headers": { "Cache-Control": "no-cache, must-revalidate" } }
