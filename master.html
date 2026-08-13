@@ -267,7 +267,8 @@
 <aside id="sidebar">
   <div class="sidebar-brand">
     <div class="sidebar-brand-row">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.9)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M3 9a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H3z"/><path d="M5 15v4h14v-4"/></svg>
+      <svg id="header-icone-padrao" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.9)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M3 9a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H3z"/><path d="M5 15v4h14v-4"/></svg>
+      <img id="header-logo-empresa" style="display:none;width:20px;height:20px;border-radius:4px;object-fit:cover">
       <h1 id="header-nome-empresa">EstoqueMax</h1>
       <span class="sidebar-version">Master</span>
     </div>
@@ -978,6 +979,12 @@
       <div class="field"><label>E-mail</label><input id="emp-email" placeholder="contato@empresa.com.br"></div>
       <div class="field"><label>Endereço</label><input id="emp-end" placeholder="Rua, número, bairro, cidade – UF"></div>
       <div class="field"><label>Slogan / Descrição curta</label><input id="emp-slogan" placeholder="Ex: Qualidade e conforto para sua casa"></div>
+      <div class="field">
+        <label>Logo da Empresa (URL)</label>
+        <input id="emp-logo" placeholder="https://.../logo.png" oninput="previewLogoEmpresa()">
+        <div style="font-size:11.5px;color:var(--sub);margin-top:4px">Cole a URL pública da imagem (ex: link do Supabase Storage). Aparece na sidebar e no romaneio de entregas.</div>
+        <img id="emp-logo-preview" style="display:none;max-height:60px;max-width:100%;margin-top:8px;border-radius:6px;border:1px solid var(--borda);padding:4px;background:#fff">
+      </div>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
         <button class="btn btn-ghost" onclick="fecharModal('empresa')">Cancelar</button>
         <button class="btn btn-success" onclick="salvarEmpresa()">Salvar</button>
@@ -999,7 +1006,22 @@ let vendas = [];
 let entregas = [];
 let vendedoras = [];
 let entregadores = [];
-let empresa = { nome: '', cnpj: '', tel: '', email: '', end: '', slogan: '' };
+let empresa = { nome: '', cnpj: '', tel: '', email: '', end: '', slogan: '', logoUrl: '' };
+let empresaLogoBase64 = null;
+async function carregarLogoBase64(url){
+  if(!url) return null;
+  try{
+    const resp = await fetch(url);
+    if(!resp.ok) return null;
+    const blob = await resp.blob();
+    return await new Promise(resolve=>{
+      const reader = new FileReader();
+      reader.onload = ()=>resolve(reader.result);
+      reader.onerror = ()=>resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch(e){ return null; }
+}
 let semanaOffset = 0;
 let editandoVenda = null, editandoEntrega = null, editandoVendedora = null, editandoEntregador = null;
 let editandoMP = null, editandoProd = null;
@@ -1075,7 +1097,8 @@ async function carregarTudo(){
   vendas = (ve.data||[]).map(vendaFromRow);
   entregas = (en.data||[]).map(entregaFromRow);
   movimentacoes = (mov.data||[]).map(movFromRow);
-  empresa = em.data ? { nome:em.data.nome||'', cnpj:em.data.cnpj||'', tel:em.data.tel||'', email:em.data.email||'', end:em.data.endereco||'', slogan:em.data.slogan||'' } : { nome:'',cnpj:'',tel:'',email:'',end:'',slogan:'' };
+  empresa = em.data ? { nome:em.data.nome||'', cnpj:em.data.cnpj||'', tel:em.data.tel||'', email:em.data.email||'', end:em.data.endereco||'', slogan:em.data.slogan||'', logoUrl:em.data.logo_url||'' } : { nome:'',cnpj:'',tel:'',email:'',end:'',slogan:'',logoUrl:'' };
+  empresaLogoBase64 = empresa.logoUrl ? await carregarLogoBase64(empresa.logoUrl) : null;
 }
 
 // ─── CIDADES POR ESTADO ───────────────────────────────────────────────────────
@@ -2127,9 +2150,12 @@ function gerarRomaneio(){
   }).join('');
   const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Romaneio ${dataFmt}</title>${estilos}</head><body>
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px">
+      <div style="display:flex;align-items:center;gap:12px">
+      ${empresa.logoUrl?`<img src="${empresa.logoUrl}" style="height:44px;max-width:120px;object-fit:contain">`:''}
       <div><h1>${nomeEmpresaPDF()} — Romaneio de Entregas</h1>
       <div class="subtit">${[empresa.cnpj,empresa.tel,empresa.email].filter(Boolean).join('  ·  ')}</div>
       <div class="subtit">${dataFmt.charAt(0).toUpperCase()+dataFmt.slice(1)} &nbsp;·&nbsp; ${entsDia.length} entrega(s) no total</div></div>
+      </div>
       <button class="no-print" onclick="window.print()" style="background:#1E4D8C;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:14px;font-weight:700;cursor:pointer">Imprimir</button>
     </div>
     ${blocos}
@@ -2209,22 +2235,42 @@ function abrirModalEmpresa(){
   document.getElementById('emp-email').value = empresa.email  || '';
   document.getElementById('emp-end').value   = empresa.end    || '';
   document.getElementById('emp-slogan').value= empresa.slogan || '';
+  document.getElementById('emp-logo').value  = empresa.logoUrl|| '';
+  previewLogoEmpresa();
   document.getElementById('modal-empresa').classList.add('open');
 }
+function previewLogoEmpresa(){
+  const url = document.getElementById('emp-logo').value.trim();
+  const img = document.getElementById('emp-logo-preview');
+  if(url){ img.src=url; img.style.display='block'; img.onerror=()=>{ img.style.display='none'; }; }
+  else img.style.display='none';
+}
 async function salvarEmpresa(){
+  const logoUrl = document.getElementById('emp-logo').value.trim();
   const obj={ id:1, nome:document.getElementById('emp-nome').value.trim(), cnpj:document.getElementById('emp-cnpj').value.trim(),
     tel:document.getElementById('emp-tel').value.trim(), email:document.getElementById('emp-email').value.trim(),
-    endereco:document.getElementById('emp-end').value.trim(), slogan:document.getElementById('emp-slogan').value.trim() };
+    endereco:document.getElementById('emp-end').value.trim(), slogan:document.getElementById('emp-slogan').value.trim(),
+    logo_url: logoUrl||null };
   const {data,error}=await sb.from('empresa').upsert(obj).select().single();
   if(error){ alert('Erro: '+error.message); return; }
-  empresa={ nome:data.nome||'',cnpj:data.cnpj||'',tel:data.tel||'',email:data.email||'',end:data.endereco||'',slogan:data.slogan||'' };
+  empresa={ nome:data.nome||'',cnpj:data.cnpj||'',tel:data.tel||'',email:data.email||'',end:data.endereco||'',slogan:data.slogan||'',logoUrl:data.logo_url||'' };
+  empresaLogoBase64 = empresa.logoUrl ? await carregarLogoBase64(empresa.logoUrl) : null;
   aplicarEmpresaNoHeader(); fecharModal('empresa');
 }
 function aplicarEmpresaNoHeader(){
   const nomeEl = document.getElementById("header-nome-empresa");
   const subEl  = document.getElementById("header-sub-empresa");
+  const iconeEl = document.getElementById("header-icone-padrao");
+  const logoEl  = document.getElementById("header-logo-empresa");
   if(nomeEl) nomeEl.textContent = empresa.nome ? empresa.nome : "EstoqueMax";
   if(subEl)  subEl.textContent  = empresa.nome ? (empresa.slogan || "Controle de Estofados") : "Controle de Estofados";
+  if(empresa.logoUrl){
+    if(logoEl){ logoEl.src = empresa.logoUrl; logoEl.style.display='block'; }
+    if(iconeEl) iconeEl.style.display='none';
+  } else {
+    if(logoEl) logoEl.style.display='none';
+    if(iconeEl) iconeEl.style.display='block';
+  }
 }
 function nomeEmpresaPDF(){ return empresa.nome || 'EstoqueMax'; }
 function rodapePDF(doc){
@@ -2426,12 +2472,20 @@ function exportarPDF(tipo) {
 
   function cabecalho(titulo, subtitulo, cor) {
     doc.setFillColor(cor[0],cor[1],cor[2]); doc.rect(0,0,W,26,'F');
+    let textX = 14;
+    if(empresaLogoBase64){
+      try{
+        const fmt = empresaLogoBase64.includes('image/png') ? 'PNG' : empresaLogoBase64.includes('image/webp') ? 'WEBP' : 'JPEG';
+        doc.addImage(empresaLogoBase64, fmt, 14, 4, 18, 18);
+        textX = 36;
+      } catch(e){}
+    }
     doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(15);
-    doc.text(nomeEmpresaPDF(), 14, 12);
+    doc.text(nomeEmpresaPDF(), textX, 12);
     doc.setFontSize(9); doc.setFont('helvetica','normal');
     const sub2 = [empresa.cnpj, empresa.tel].filter(Boolean).join('  ·  ') || 'Controle de Estofados';
-    doc.text(sub2, 14, 18);
-    doc.setFontSize(8); doc.text('Período: '+labelPeriodoTexto()+'  ·  Emitido em '+dataHoje, 14, 23);
+    doc.text(sub2, textX, 18);
+    doc.setFontSize(8); doc.text('Período: '+labelPeriodoTexto()+'  ·  Emitido em '+dataHoje, textX, 23);
     doc.setTextColor(30,40,64); doc.setFontSize(13); doc.setFont('helvetica','bold');
     doc.text(titulo, 14, 36);
     let y = 42;
