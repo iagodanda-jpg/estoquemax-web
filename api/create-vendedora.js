@@ -40,8 +40,8 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const { email, password, vendedoraId } = payload;
-  if (!email || !password || !vendedoraId) {
+  const { username, password, vendedoraId } = payload;
+  if (!username || !password || !vendedoraId) {
     res.statusCode = 400;
     res.end(JSON.stringify({ error: 'Dados incompletos.' }));
     return;
@@ -49,6 +49,12 @@ module.exports = async function handler(req, res) {
   if (String(password).length < 6) {
     res.statusCode = 400;
     res.end(JSON.stringify({ error: 'Senha deve ter ao menos 6 caracteres.' }));
+    return;
+  }
+  const email = String(username).trim().toLowerCase().replace(/[^a-z0-9]/g, '') + '@estoquemax.internal';
+  if (email === '@estoquemax.internal') {
+    res.statusCode = 400;
+    res.end(JSON.stringify({ error: 'Nome de usuário inválido.' }));
     return;
   }
 

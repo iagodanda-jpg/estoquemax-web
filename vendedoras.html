@@ -60,7 +60,7 @@
       <h1>EstoqueMax</h1>
       <p style="color:var(--sub);font-size:13px;margin-bottom:18px">Acesso Vendedoras</p>
       <div class="er" id="le"></div>
-      <div class="fi" style="text-align:left"><label>E-mail</label><input id="em" type="email" placeholder="seu@email.com"></div>
+      <div class="fi" style="text-align:left"><label>Usuário</label><input id="em" type="text" placeholder="seu usuário" autocapitalize="none"></div>
       <div class="fi" style="text-align:left"><label>Senha</label><input id="pw" type="password" placeholder="••••••••"></div>
       <button class="bt bp" id="bl" onclick="login()">Entrar</button>
       <div style="text-align:center;margin-top:14px"><a href="/master" style="color:var(--sub);font-size:13px">Acesso Master</a></div>
@@ -389,12 +389,13 @@ function selecionarDiaCal(diaISO){
 }
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
+function usernameParaEmail(u){ return (u||'').trim().toLowerCase().replace(/[^a-z0-9]/g,'') + '@estoquemax.internal'; }
 async function login(){
   const em=document.getElementById('em').value, pw=document.getElementById('pw').value;
   const er=document.getElementById('le'), bl=document.getElementById('bl');
   er.style.display='none'; bl.textContent='Entrando...'; bl.disabled=true;
-  const {data,error}=await sb.auth.signInWithPassword({email:em,password:pw});
-  if(error){ er.textContent='Email ou senha incorretos.'; er.style.display='block'; bl.textContent='Entrar'; bl.disabled=false; return; }
+  const {data,error}=await sb.auth.signInWithPassword({email:usernameParaEmail(em),password:pw});
+  if(error){ er.textContent='Usuário ou senha incorretos.'; er.style.display='block'; bl.textContent='Entrar'; bl.disabled=false; return; }
   const {data:p}=await sb.from('perfis').select('role,nome').eq('id',data.user.id).single();
   if(!p||p.role==='master'){ er.textContent='Use o sistema Master.'; er.style.display='block'; await sb.auth.signOut(); bl.textContent='Entrar'; bl.disabled=false; return; }
   pid=data.user.id;

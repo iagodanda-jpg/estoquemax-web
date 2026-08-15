@@ -253,7 +253,7 @@
     <h1>EstoqueMax</h1>
     <div class="sub">Acesso Master</div>
     <div id="login-erro"></div>
-    <div class="field" style="margin-bottom:10px"><label>E-mail</label><input id="login-email" type="email" placeholder="seu@email.com"></div>
+    <div class="field" style="margin-bottom:10px"><label>Usuário</label><input id="login-usuario" type="text" placeholder="seu usuário" autocapitalize="none"></div>
     <div class="field" style="margin-bottom:16px"><label>Senha</label><input id="login-senha" type="password" placeholder="••••••••"></div>
     <button class="btn btn-primary" id="btn-login" onclick="login()" style="width:100%">Entrar</button>
     <div style="text-align:center;margin-top:14px"><a href="/vendedoras" style="color:var(--sub);font-size:13px">Acesso Vendedoras</a></div>
@@ -1661,21 +1661,22 @@ function popularSelectVendedoras(){
 }
 async function criarAcessoVendedora(id){
   const v=vendedoras.find(x=>x.id===id); if(!v) return;
-  const email=prompt(`E-mail de acesso para ${v.nome}:`, v.email||'');
-  if(!email) return;
+  const usuarioSugerido=(v.nome||'').split(' ')[0];
+  const usuario=prompt(`Nome de usuário de acesso para ${v.nome}:`, usuarioSugerido);
+  if(!usuario) return;
   const senha=prompt('Senha temporária (mínimo 6 caracteres):');
   if(!senha||senha.length<6){ alert('A senha deve ter ao menos 6 caracteres.'); return; }
   const {data:{session}}=await sb.auth.getSession();
   const resp=await fetch('/api/create-vendedora',{
     method:'POST',
     headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+session.access_token},
-    body:JSON.stringify({email,password:senha,vendedoraId:id})
+    body:JSON.stringify({username:usuario,password:senha,vendedoraId:id})
   });
   const out=await resp.json().catch(()=>({}));
   if(!resp.ok){ alert('Erro: '+(out.error||'não foi possível criar o acesso.')); return; }
   vendedoras=vendedoras.map(x=>x.id===id?{...x,perfil_id:out.perfilId}:x);
   renderListaVendedorasModal();
-  alert('Acesso criado! A vendedora já pode entrar em /vendedoras com o e-mail e senha informados.');
+  alert(`Acesso criado! A vendedora já pode entrar em /vendedoras com o usuário "${usuario}" e a senha informada.`);
 }
 
 // ─── ENTREGADORES ─────────────────────────────────────────────────────────────
@@ -3168,16 +3169,17 @@ function exportarPDF(tipo) {
 }
 
 // ─── LOGIN / SESSÃO ──────────────────────────────────────────────────────────
+function usernameParaEmail(u){ return (u||'').trim().toLowerCase().replace(/[^a-z0-9]/g,'') + '@estoquemax.internal'; }
 async function login(){
-  const email=document.getElementById('login-email').value.trim();
+  const usuario=document.getElementById('login-usuario').value.trim();
   const senha=document.getElementById('login-senha').value;
   const erro=document.getElementById('login-erro');
   const btn=document.getElementById('btn-login');
   erro.style.display='none';
-  if(!email||!senha){ erro.textContent='Informe e-mail e senha.'; erro.style.display='block'; return; }
+  if(!usuario||!senha){ erro.textContent='Informe usuário e senha.'; erro.style.display='block'; return; }
   btn.textContent='Entrando...'; btn.disabled=true;
-  const {data,error}=await sb.auth.signInWithPassword({email,password:senha});
-  if(error){ erro.textContent='E-mail ou senha incorretos.'; erro.style.display='block'; btn.textContent='Entrar'; btn.disabled=false; return; }
+  const {data,error}=await sb.auth.signInWithPassword({email:usernameParaEmail(usuario),password:senha});
+  if(error){ erro.textContent='Usuário ou senha incorretos.'; erro.style.display='block'; btn.textContent='Entrar'; btn.disabled=false; return; }
   const {data:perfil}=await sb.from('perfis').select('role,nome').eq('id',data.user.id).single();
   if(!perfil||perfil.role!=='master'){
     erro.textContent='Acesso exclusivo ao administrador.'; erro.style.display='block';
