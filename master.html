@@ -1647,7 +1647,7 @@ function renderListaVendedorasModal(){
       <div><div style="font-weight:700">${v.nome}</div>
       <div style="font-size:12px;color:var(--sub)">${v.tel||''}${v.email?' · '+v.email:''} · Comissão: <b>${v.comissao}%</b></div></div>
       <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
-        ${v.perfil_id?'<span class="badge badge-verde">Login ativo</span>':`<button class="btn btn-sm" style="background:#DBEAFE;color:#1E40AF;border:1px solid #93C5FD" onclick="criarAcessoVendedora(${v.id})">Criar acesso</button>`}
+        ${v.perfil_id?`<span class="badge badge-verde">Login ativo</span><button class="btn btn-sm btn-ghost" onclick="alterarAcessoVendedora(${v.id})">Alterar acesso</button>`:`<button class="btn btn-sm" style="background:#DBEAFE;color:#1E40AF;border:1px solid #93C5FD" onclick="criarAcessoVendedora(${v.id})">Criar acesso</button>`}
         <button class="btn btn-sm btn-ghost" onclick="editarVendedoraModal(${v.id})">Editar</button>
         <button class="btn btn-sm" style="background:none;border:1.5px solid var(--borda)" onclick="excluirVendedoraModal(${v.id})">Excluir</button>
       </div>
@@ -1677,6 +1677,22 @@ async function criarAcessoVendedora(id){
   vendedoras=vendedoras.map(x=>x.id===id?{...x,perfil_id:out.perfilId}:x);
   renderListaVendedorasModal();
   alert(`Acesso criado! A vendedora já pode entrar em /vendedoras com o usuário "${usuario}" e a senha informada.`);
+}
+async function alterarAcessoVendedora(id){
+  const v=vendedoras.find(x=>x.id===id); if(!v) return;
+  const novoUsuario=prompt(`Novo nome de usuário para ${v.nome} (deixe em branco para não alterar):`, '');
+  const novaSenha=prompt('Nova senha (mínimo 6 caracteres, deixe em branco para não alterar):', '');
+  if(!novoUsuario && !novaSenha){ alert('Nada foi alterado.'); return; }
+  if(novaSenha && novaSenha.length<6){ alert('A senha deve ter ao menos 6 caracteres.'); return; }
+  const {data:{session}}=await sb.auth.getSession();
+  const resp=await fetch('/api/editar-acesso-vendedora',{
+    method:'POST',
+    headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+session.access_token},
+    body:JSON.stringify({vendedoraId:id, newUsername:novoUsuario||null, newPassword:novaSenha||null})
+  });
+  const out=await resp.json().catch(()=>({}));
+  if(!resp.ok){ alert('Erro: '+(out.error||'não foi possível alterar o acesso.')); return; }
+  alert('Acesso atualizado com sucesso!'+(novoUsuario?` Novo usuário: "${novoUsuario}".`:'')+(novaSenha?' Senha alterada.':''));
 }
 
 // ─── ENTREGADORES ─────────────────────────────────────────────────────────────
