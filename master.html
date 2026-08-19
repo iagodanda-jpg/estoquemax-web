@@ -1460,8 +1460,9 @@ async function salvarMP(){
 }
 async function excluirMP(id){
   if(!confirm('Excluir este item?')) return;
-  const {error}=await sb.from('materias_primas').delete().eq('id',id);
+  const {data:apagados, error}=await sb.from('materias_primas').delete().eq('id',id).select('id');
   if(error){ alert('Erro: '+error.message); return; }
+  if(!apagados || !apagados.length){ alert('Item não excluído: falta permissão no banco (RLS).'); return; }
   materias=materias.filter(m=>m.id!==id); renderMP(); renderDash();
 }
 
@@ -1509,8 +1510,9 @@ async function salvarProd(){
 }
 async function excluirProd(id){
   if(!confirm('Excluir este produto?')) return;
-  const {error}=await sb.from('produtos').delete().eq('id',id);
+  const {data:apagados, error}=await sb.from('produtos').delete().eq('id',id).select('id');
   if(error){ alert('Erro: '+error.message); return; }
+  if(!apagados || !apagados.length){ alert('Produto não excluído: falta permissão no banco (RLS).'); return; }
   produtos=produtos.filter(p=>p.id!==id); renderProd(); renderDash();
 }
 
@@ -1621,8 +1623,9 @@ function editarVendedoraModal(id){
 }
 async function excluirVendedoraModal(id){
   if(!confirm('Excluir esta vendedora?')) return;
-  const {error}=await sb.from('vendedoras').delete().eq('id',id);
+  const {data:apagados, error}=await sb.from('vendedoras').delete().eq('id',id).select('id');
   if(error){ alert('Erro: '+error.message); return; }
+  if(!apagados || !apagados.length){ alert('Vendedora não excluída: falta permissão no banco (RLS).'); return; }
   vendedoras=vendedoras.filter(v=>v.id!==id); renderListaVendedorasModal(); popularSelectVendedoras();
 }
 function renderListaVendedorasModal(){
@@ -1710,8 +1713,9 @@ function editarEntregadorModal(id){
 }
 async function excluirEntregadorModal(id){
   if(!confirm('Excluir este entregador?')) return;
-  const {error}=await sb.from('entregadores').delete().eq('id',id);
+  const {data:apagados, error}=await sb.from('entregadores').delete().eq('id',id).select('id');
   if(error){ alert('Erro: '+error.message); return; }
+  if(!apagados || !apagados.length){ alert('Entregador não excluído: falta permissão no banco (RLS).'); return; }
   entregadores=entregadores.filter(e=>e.id!==id); renderListaEntregadoresModal(); popularSelectEntregadores();
 }
 function renderListaEntregadoresModal(){
@@ -1852,8 +1856,9 @@ async function mudarStatusPosVenda(id,status){
 }
 async function excluirPosVenda(id){
   if(!confirm('Excluir este registro de pós-venda?')) return;
-  const {error}=await sb.from('pos_vendas').delete().eq('id',id);
+  const {data:apagados, error}=await sb.from('pos_vendas').delete().eq('id',id).select('id');
   if(error){ alert('Erro: '+error.message); return; }
+  if(!apagados || !apagados.length){ alert('Registro não excluído: falta permissão no banco (RLS).'); return; }
   posVendas=posVendas.filter(p=>p.id!==id); renderPosVendas(); renderDash();
 }
 
@@ -2295,8 +2300,9 @@ async function excluirVenda(id){
   if(!confirm('Excluir esta venda?')) return;
   const {error:errDesvincula} = await sb.from('entregas').update({venda_id:null}).eq('venda_id',id);
   if(errDesvincula){ alert('Erro ao desvincular entrega: '+errDesvincula.message); return; }
-  const {error}=await sb.from('vendas').delete().eq('id',id);
+  const {data:apagados, error}=await sb.from('vendas').delete().eq('id',id).select('id');
   if(error){ alert('Erro: '+error.message); return; }
+  if(!apagados || !apagados.length){ alert('A venda não foi excluída: falta permissão no banco (RLS) para o administrador excluir vendas. Peça pra rodar a policy de DELETE na tabela "vendas".'); return; }
   vendas=vendas.filter(v=>v.id!==id);
   entregas=entregas.map(e=>e.vendaId==id?{...e,vendaId:null}:e);
   renderVendas(); renderEntregas();
@@ -2502,8 +2508,9 @@ async function mudarStatusEntrega(id,status){
 }
 async function excluirEntrega(id){
   if(!confirm('Excluir esta entrega?')) return;
-  const {error}=await sb.from('entregas').delete().eq('id',id);
+  const {data:apagados, error}=await sb.from('entregas').delete().eq('id',id).select('id');
   if(error){ alert('Erro: '+error.message); return; }
+  if(!apagados || !apagados.length){ alert('Entrega não excluída: falta permissão no banco (RLS).'); return; }
   entregas=entregas.filter(e=>e.id!==id); renderEntregas(); renderCalendario();
 }
 
