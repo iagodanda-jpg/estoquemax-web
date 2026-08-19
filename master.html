@@ -2297,14 +2297,14 @@ async function mudarStatusVenda(id,status){
   renderVendas(); renderProd(); renderDash();
 }
 async function excluirVenda(id){
-  if(!confirm('Excluir esta venda?')) return;
-  const {error:errDesvincula} = await sb.from('entregas').update({venda_id:null}).eq('venda_id',id);
-  if(errDesvincula){ alert('Erro ao desvincular entrega: '+errDesvincula.message); return; }
+  if(!confirm('Excluir esta venda? A entrega vinculada a ela também será excluída.')) return;
+  const {error:errEntrega} = await sb.from('entregas').delete().eq('venda_id',id);
+  if(errEntrega){ alert('Erro ao excluir entrega vinculada: '+errEntrega.message); return; }
   const {data:apagados, error}=await sb.from('vendas').delete().eq('id',id).select('id');
   if(error){ alert('Erro: '+error.message); return; }
   if(!apagados || !apagados.length){ alert('A venda não foi excluída: falta permissão no banco (RLS) para o administrador excluir vendas. Peça pra rodar a policy de DELETE na tabela "vendas".'); return; }
   vendas=vendas.filter(v=>v.id!==id);
-  entregas=entregas.map(e=>e.vendaId==id?{...e,vendaId:null}:e);
+  entregas=entregas.filter(e=>e.vendaId!=id);
   renderVendas(); renderEntregas();
 }
 function agendarEntregaDaVenda(vid){
