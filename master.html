@@ -301,10 +301,6 @@
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
       Matérias-Primas
     </button>
-    <button onclick="irAba('movimentacoes')">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-      Movimentações
-    </button>
     <div class="sidebar-sep"></div>
     <button id="btn-alerta-aba" onclick="irAba('alertas')">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -450,22 +446,6 @@
       <table>
         <thead><tr><th>Matéria-Prima</th><th>Categoria</th><th>Qtd</th><th>Unid.</th><th>Mín.</th><th>Custo/unid.</th><th>Valor Total</th><th>Status</th><th></th></tr></thead>
         <tbody id="tbody-mp"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- MOVIMENTAÇÕES -->
-  <div id="aba-movimentacoes" class="aba">
-    <div class="toolbar" style="justify-content:flex-end">
-      <button class="btn btn-primary" onclick="abrirModalMov()" style="display:flex;align-items:center;gap:6px">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-        Nova Movimentação
-      </button>
-    </div>
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr><th>#</th><th>Data</th><th>Tipo Mov.</th><th>Tabela</th><th>Item</th><th>Qtd</th><th>Motivo</th><th>Nº Pedido</th></tr></thead>
-        <tbody id="tbody-mov"></tbody>
       </table>
     </div>
   </div>
@@ -656,6 +636,12 @@
         <div style="color:var(--sub);font-size:13px;margin-bottom:16px">Inventário atual de matérias-primas.</div>
         <button class="btn btn-warn" onclick="exportarPDF('mp')">Exportar PDF</button>
       </div>
+      <div class="card" style="border-left:5px solid #6B7280">
+        <div style="margin-bottom:12px;color:#6B7280"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:4px">Conferência de Estoque</div>
+        <div style="color:var(--sub);font-size:13px;margin-bottom:16px">Matérias-primas com coluna em branco pra contagem física — pra imprimir e o funcionário preencher à mão.</div>
+        <button class="btn" style="background:#6B7280;color:#fff" onclick="exportarPDF('conferencia')">Exportar PDF</button>
+      </div>
       <div class="card" style="border-left:5px solid var(--vm)">
         <div style="margin-bottom:12px;color:var(--vm)"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
         <div style="font-weight:700;font-size:15px;margin-bottom:4px">Alertas de Estoque</div>
@@ -786,6 +772,7 @@
         <div class="field"><label>Cliente</label><input id="v-cliente" placeholder="Nome do cliente"></div>
         <div class="field"><label>Telefone</label><input id="v-tel" placeholder="(00) 00000-0000"></div>
       </div>
+      <div class="field"><label>CPF do Cliente</label><input id="v-cpf" placeholder="000.000.000-00"></div>
       <div class="grid2">
         <div class="field"><label>Vendedora</label><select id="v-vendedora"><option value="">— Nenhuma —</option></select></div>
         <div class="field"><label>Forma de Pagamento</label>
@@ -1151,7 +1138,7 @@ function normalizeMP(r){ return {...r, qtd:Number(r.qtd), minimo:Number(r.minimo
 
 function vendaFromRow(r){
   return {
-    id:r.id, cliente:r.cliente, tel:r.tel||'',
+    id:r.id, cliente:r.cliente, tel:r.tel||'', cpf:r.cpf||'',
     end:[r.end_rua,r.end_num,r.end_cidade,r.end_estado].filter(Boolean).join(', '),
     endRua:r.end_rua||'', endNum:r.end_num||'', endCidade:r.end_cidade||'', endEstado:r.end_estado||'',
     itens:r.itens||[], subtotal:Number(r.subtotal)||0,
@@ -1169,7 +1156,7 @@ function vendaFromRow(r){
 }
 function vendaToRow(obj){
   return {
-    cliente:obj.cliente, tel:obj.tel, end_rua:obj.endRua, end_num:obj.endNum, end_cidade:obj.endCidade, end_estado:obj.endEstado,
+    cliente:obj.cliente, tel:obj.tel, cpf:obj.cpf||null, end_rua:obj.endRua, end_num:obj.endNum, end_cidade:obj.endCidade, end_estado:obj.endEstado,
     itens:obj.itens, subtotal:obj.subtotal, desconto:obj.desconto, desconto_raw:obj.descontoRaw,
     desconto_modo:obj.descontoModo, desconto_obs:obj.descontoObs,
     total:obj.total, pgto:obj.pgto, bandeira:obj.bandeira, parcelas:obj.parcelas?String(obj.parcelas):null,
@@ -1262,7 +1249,7 @@ function popularCidades(idEstado, idCidade){
 }
 
 // ─── SIDEBAR / NAVEGAÇÃO ──────────────────────────────────────────────────────
-const NOMES_ABAS = { dashboard:'Dashboard', vendas:'Vendas', entregas:'Entregas', posvenda:'Pós-venda', produtos:'Produtos', materias:'Matérias-Primas', movimentacoes:'Movimentações', alertas:'Alertas', exportar:'Exportar PDF', backup:'Backup' };
+const NOMES_ABAS = { dashboard:'Dashboard', vendas:'Vendas', entregas:'Entregas', posvenda:'Pós-venda', produtos:'Produtos', materias:'Matérias-Primas', alertas:'Alertas', exportar:'Exportar PDF', backup:'Backup' };
 function abrirSidebar(){ document.getElementById('sidebar').classList.add('open'); document.getElementById('sidebar-overlay').classList.add('show'); }
 function fecharSidebar(){ document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebar-overlay').classList.remove('show'); }
 function irAba(id){
@@ -1276,7 +1263,6 @@ function irAba(id){
   if(id==='entregas'){ renderEntregas(); renderCalendario(); }
   if(id==='produtos') renderProd();
   if(id==='materias') renderMP();
-  if(id==='movimentacoes') renderMov();
   if(id==='alertas') renderAlertas();
   if(id==='posvenda') renderPosVendas();
   fecharSidebar();
@@ -2095,7 +2081,7 @@ function abrirModalVenda(){
   editandoVenda=null;
   itensVendaTemp=[{id:'',nome:'',qtd:1,preco:0}];
   document.getElementById('modal-venda-titulo').textContent='Nova Venda';
-  ['v-cliente','v-tel','v-end-rua','v-end-num','v-end-cidade','v-obs','v-desconto','v-desconto-obs'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  ['v-cliente','v-tel','v-cpf','v-end-rua','v-end-num','v-end-cidade','v-obs','v-desconto','v-desconto-obs'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('v-end-estado').value='';
   document.getElementById('v-pgto').value='PIX';
   document.getElementById('v-status').value='pendente';
@@ -2122,6 +2108,7 @@ function editarVenda(id){
   document.getElementById('modal-venda-titulo').textContent='Editar Venda';
   document.getElementById('v-cliente').value=v.cliente;
   document.getElementById('v-tel').value=v.tel||'';
+  document.getElementById('v-cpf').value=v.cpf||'';
   document.getElementById('v-end-rua').value=v.endRua||'';
   document.getElementById('v-end-num').value=v.endNum||'';
   document.getElementById('v-end-estado').value=v.endEstado||'';
@@ -2230,7 +2217,7 @@ async function salvarVenda(){
   const valorLiquido=(valor1-taxaValor)+(valor2-taxaValor2);
   const status=document.getElementById('v-status').value;
   const obj={
-    cliente, tel:document.getElementById('v-tel').value,
+    cliente, tel:document.getElementById('v-tel').value, cpf:document.getElementById('v-cpf').value,
     endRua, endNum, endCidade, endEstado,
     itens:itensFiltrados, subtotal, desconto:descValor, descontoRaw:descRaw,
     descontoModo:descModo, descontoObs:document.getElementById('v-desconto-obs').value,
@@ -2306,9 +2293,13 @@ async function mudarStatusVenda(id,status){
 }
 async function excluirVenda(id){
   if(!confirm('Excluir esta venda?')) return;
+  const {error:errDesvincula} = await sb.from('entregas').update({venda_id:null}).eq('venda_id',id);
+  if(errDesvincula){ alert('Erro ao desvincular entrega: '+errDesvincula.message); return; }
   const {error}=await sb.from('vendas').delete().eq('id',id);
   if(error){ alert('Erro: '+error.message); return; }
-  vendas=vendas.filter(v=>v.id!==id); renderVendas();
+  vendas=vendas.filter(v=>v.id!==id);
+  entregas=entregas.map(e=>e.vendaId==id?{...e,vendaId:null}:e);
+  renderVendas(); renderEntregas();
 }
 function agendarEntregaDaVenda(vid){
   const v=vendas.find(x=>x.id===vid); if(!v) return;
@@ -3027,10 +3018,15 @@ function exportarPDF(tipo) {
     const totalRecebido = vendasFiltradas.filter(v=>v.pgtoRecebido==='sim').reduce((a,v)=>a+v.total,0);
     const totalPendente = totalGeral - totalRecebido;
     const totalCancelado = vendasCanceladas.reduce((a,v)=>a+v.total,0);
+    const totalComissoesGeral = vendedoras.reduce((acc,vend)=>{
+      const lista = vendasFiltradas.filter(v=>v.vendedoraId==vend.id);
+      const recebVend = lista.filter(v=>v.pgtoRecebido==='sim').reduce((a,v)=>a+v.total,0);
+      return acc + recebVend*((vend.comissao||0)/100);
+    },0);
     doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(30,40,64);
     doc.text('Resumo Geral (vendas ativas — sem cancelados)', 14, y); y+=6;
-    doc.autoTable({ startY:y, margin:{left:14,right:14}, head:[['Total de Vendas','Valor Total','Recebido','A Receber']],
-      body:[[vendasFiltradas.length, fmtR(totalGeral), fmtR(totalRecebido), fmtR(totalPendente)]],
+    doc.autoTable({ startY:y, margin:{left:14,right:14}, head:[['Total de Vendas','Valor Total','Recebido','A Receber','Comissões (total)']],
+      body:[[vendasFiltradas.length, fmtR(totalGeral), fmtR(totalRecebido), fmtR(totalPendente), fmtR(totalComissoesGeral)]],
       styles:{fontSize:10,cellPadding:4}, headStyles:{fillColor:[26,122,74],textColor:255,fontStyle:'bold'} });
     y = doc.lastAutoTable.finalY + 6;
     if(vendasCanceladas.length){
@@ -3134,6 +3130,20 @@ function exportarPDF(tipo) {
     });
     totalTabela(doc, doc.lastAutoTable.finalY+4, `Total: ${materias.length} itens`, `Valor total em estoque: ${fmtR(totalVal)}`);
     if(tipo==='mp'){ rodape(doc); doc.save(`materias-primas-${dataHoje.replace(/\//g,'-')}.pdf`); return; }
+  }
+  if(tipo==='conferencia') {
+    let y = cabecalho('Conferência de Estoque — Matérias-Primas', 'Contagem física: preencher a coluna "Qtd Real" à mão', [30,40,64]);
+    const listaOrdenada = [...materias].sort((a,b)=>(a.categoria||'').localeCompare(b.categoria||'')||a.nome.localeCompare(b.nome));
+    doc.autoTable({ startY: y, margin:{left:14,right:14}, head:[['Matéria-Prima','Categoria','Unid.','Qtd Sistema','Qtd Real (preencher)','Diferença']],
+      body: listaOrdenada.map(m=>[m.nome, m.categoria||'', m.unidade, m.qtd, '', '']),
+      styles:{fontSize:9,cellPadding:4,minCellHeight:9}, headStyles:{fillColor:[30,40,64],textColor:255,fontStyle:'bold'},
+      alternateRowStyles:{fillColor:[240,244,248]},
+      columnStyles:{2:{halign:'center'},3:{halign:'center'},4:{halign:'center',cellWidth:35},5:{halign:'center',cellWidth:30}}
+    });
+    const yFinal = doc.lastAutoTable.finalY + 10;
+    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(90,106,138);
+    doc.text('Conferido por: ______________________________     Data: ____/____/______', 14, yFinal);
+    rodape(doc); doc.save(`conferencia-estoque-${dataHoje.replace(/\//g,'-')}.pdf`); return;
   }
   if(tipo==='alertas' || tipo==='completo') {
     if(tipo==='completo') doc.addPage();
