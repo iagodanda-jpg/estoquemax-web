@@ -289,7 +289,7 @@
 
 <script>
 const SU='https://nuqnlzmmnrrodlalijrb.supabase.co';
-let sb, prods=[], it=[{id:'',n:'',q:1,p:0}], oi=[{id:'',n:'',q:1,p:0}], pid, vid, enm='Iago Estofados', emp={};
+let sb, prods=[], it=[{id:'',n:'',q:1,p:0}], oi=[{id:'',n:'',q:1,p:0}], pid, vid, enm='Iago Estofados', emp={}, vendasCache=[];
 let entregasVend=[], semanaOffsetVend=0;
 let empLogoBase64=null;
 async function carregarLogoBase64Vend(url){
@@ -499,7 +499,13 @@ async function cD(){
 }
 async function cMV(){
   const {data:vs}=await sb.from('vendas').select('*').eq('perfil_vendedora_id',pid).order('criado_em',{ascending:false});
-  document.getElementById('lv').innerHTML=(vs||[]).map(v=>`<div class="vi"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><div><b>${v.cliente}</b><div style="font-size:11px;color:var(--sub)">${new Date(v.data_venda||v.criado_em).toLocaleDateString('pt-BR')} - ${v.pgto||''}</div></div><b style="color:var(--verde)">${fR(v.total)}</b></div><span class="badge" style="background:${CL[v.status]||'#DBEAFE'}">${LB[v.status]||v.status}</span></div>`).join('')||'<div style="text-align:center;color:var(--sub);padding:30px">Nenhuma venda</div>';
+  vendasCache=vs||[];
+  document.getElementById('lv').innerHTML=(vs||[]).map(v=>`<div class="vi"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><div><b>${v.cliente}</b><div style="font-size:11px;color:var(--sub)">${new Date(v.data_venda||v.criado_em).toLocaleDateString('pt-BR')} - ${v.pgto||''}</div></div><b style="color:var(--verde)">${fR(v.total)}</b></div><div style="display:flex;justify-content:space-between;align-items:center"><span class="badge" style="background:${CL[v.status]||'#DBEAFE'}">${LB[v.status]||v.status}</span><button onclick="baixarPedido(${v.id})" style="background:#EFF6FF;border:1px solid #BFDBFE;color:#1E4D8C;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer">📄 Gerar Pedido</button></div></div>`).join('')||'<div style="text-align:center;color:var(--sub);padding:30px">Nenhuma venda</div>';
+}
+async function baixarPedido(id){
+  const v=vendasCache.find(x=>x.id===id);
+  if(!v) return alert('Venda não encontrada.');
+  await gerarPedidoPDF(v, v.itens||[]);
 }
 
 // ─── ITENS DE VENDA ────────────────────────────────────────────────────────────
