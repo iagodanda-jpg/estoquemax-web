@@ -2343,6 +2343,27 @@ function renderMetricasEntregas(){
     {l:'% Reagendado',v:pctReagendado+'%',s:motivosTxt,cor:'#B45309'},
   ].map(k=>`<div class="kpi" style="border-left:5px solid ${k.cor}"><div class="kpi-label">${k.l}</div><div class="kpi-valor">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');
 }
+const LBL_STATUS_ENTREGA={agendado:'Agendado',em_rota:'Em Rota',entregue:'Entregue',reagendado:'Reagendado'};
+function trEntrega(e){
+  const ent=entregadores.find(x=>x.id==e.entregadorId);
+  const vendaLig=e.vendaId?vendas.find(v=>v.id==e.vendaId):null;
+  const vend=vendaLig?.vendedoraId?vendedoras.find(x=>x.id==vendaLig.vendedoraId):null;
+  return `<tr>
+    <td style="color:var(--sub)">#${e.id}</td><td><b>${e.data}</b></td><td>${badge(e.periodo,'badge-cinza')}</td>
+    <td><b>${e.cliente}</b></td><td style="font-size:12px;color:var(--sub);max-width:130px">${e.end||'—'}</td>
+    <td style="font-size:12px;color:var(--sub)">${e.itens||'—'}</td>
+    <td style="font-size:12px">${vend?vend.nome:'<span style="color:var(--sub)">—</span>'}</td>
+    <td style="font-size:12px">${ent?`<span style="font-weight:600">${ent.nome}</span>${ent.veiculo?`<div style="font-size:10px;color:var(--sub)">${ent.veiculo}${ent.placa?' · '+ent.placa:''}</div>`:''}`:badge('Não definido','badge-cinza')}</td>
+    <td style="font-size:12px;color:var(--sub)">${e.vendaId?'#'+e.vendaId:'—'}</td>
+    <td><select onchange="mudarStatusEntrega(${e.id},this.value)" style="border:1.5px solid var(--borda);border-radius:6px;padding:4px 8px;font-size:12px;background:#fff">
+        ${Object.entries(LBL_STATUS_ENTREGA).map(([k,v])=>`<option value="${k}"${e.status===k?' selected':''}>${v}</option>`).join('')}</select></td>
+    <td style="font-size:12px;color:var(--sub)">${e.obs||'—'}</td>
+    <td><div style="display:flex;gap:4px">
+        <button class="btn btn-sm btn-ghost" onclick="editarEntrega(${e.id})">Editar</button>
+        <button class="btn btn-sm" style="background:none;border:1.5px solid var(--borda)" onclick="excluirEntrega(${e.id})">Excluir</button>
+        <button class="btn btn-sm" style="background:#1A2540;color:#fff" onclick="imprimirEntrega(${e.id})" title="Imprimir">Imprimir</button>
+    </div></td></tr>`;
+}
 function renderEntregas(){
   renderMetricasEntregas();
   const busca=(document.getElementById('busca-entrega')?.value||'').toLowerCase();
@@ -2356,27 +2377,7 @@ function renderEntregas(){
   }).sort((a,b)=>a.dataISO>b.dataISO?1:-1);
   const tbody=document.getElementById('tbody-entregas');
   if(!lista.length){ tbody.innerHTML=`<tr><td colspan="12" class="sem-dados">Nenhuma entrega agendada.</td></tr>`; return; }
-  const lblSt={agendado:'Agendado',em_rota:'Em Rota',entregue:'Entregue',reagendado:'Reagendado'};
-  tbody.innerHTML=lista.map(e=>{
-    const ent=entregadores.find(x=>x.id==e.entregadorId);
-    const vendaLig=e.vendaId?vendas.find(v=>v.id==e.vendaId):null;
-    const vend=vendaLig?.vendedoraId?vendedoras.find(x=>x.id==vendaLig.vendedoraId):null;
-    return `<tr>
-    <td style="color:var(--sub)">#${e.id}</td><td><b>${e.data}</b></td><td>${badge(e.periodo,'badge-cinza')}</td>
-    <td><b>${e.cliente}</b></td><td style="font-size:12px;color:var(--sub);max-width:130px">${e.end||'—'}</td>
-    <td style="font-size:12px;color:var(--sub)">${e.itens||'—'}</td>
-    <td style="font-size:12px">${vend?vend.nome:'<span style="color:var(--sub)">—</span>'}</td>
-    <td style="font-size:12px">${ent?`<span style="font-weight:600">${ent.nome}</span>${ent.veiculo?`<div style="font-size:10px;color:var(--sub)">${ent.veiculo}${ent.placa?' · '+ent.placa:''}</div>`:''}`:badge('Não definido','badge-cinza')}</td>
-    <td style="font-size:12px;color:var(--sub)">${e.vendaId?'#'+e.vendaId:'—'}</td>
-    <td><select onchange="mudarStatusEntrega(${e.id},this.value)" style="border:1.5px solid var(--borda);border-radius:6px;padding:4px 8px;font-size:12px;background:#fff">
-        ${Object.entries(lblSt).map(([k,v])=>`<option value="${k}"${e.status===k?' selected':''}>${v}</option>`).join('')}</select></td>
-    <td style="font-size:12px;color:var(--sub)">${e.obs||'—'}</td>
-    <td><div style="display:flex;gap:4px">
-        <button class="btn btn-sm btn-ghost" onclick="editarEntrega(${e.id})">Editar</button>
-        <button class="btn btn-sm" style="background:none;border:1.5px solid var(--borda)" onclick="excluirEntrega(${e.id})">Excluir</button>
-        <button class="btn btn-sm" style="background:#1A2540;color:#fff" onclick="imprimirEntrega(${e.id})" title="Imprimir">Imprimir</button>
-    </div></td></tr>`;
-  }).join('');
+  tbody.innerHTML=lista.map(trEntrega).join('');
 }
 function renderCalendario(){
   const hoje2=new Date(); hoje2.setHours(0,0,0,0);
@@ -2409,15 +2410,7 @@ function filtrarDia(diaISO){
   const tbody=document.getElementById('tbody-entregas');
   const lista=entregas.filter(e=>e.dataISO===diaISO).sort((a,b)=>a.periodo>b.periodo?1:-1);
   if(!lista.length){ tbody.innerHTML=`<tr><td colspan="12" class="sem-dados">Nenhuma entrega para este dia.</td></tr>`; return; }
-  const lblSt={agendado:'Agendado',em_rota:'Em Rota',entregue:'Entregue',reagendado:'Reagendado'};
-  tbody.innerHTML=lista.map(e=>`<tr style="background:#EFF6FF">
-    <td style="color:var(--sub)">#${e.id}</td><td><b>${e.data}</b></td><td>${badge(e.periodo,'badge-cinza')}</td>
-    <td><b>${e.cliente}</b></td><td style="font-size:12px;color:var(--sub)">${e.end||'—'}</td>
-    <td style="font-size:12px;color:var(--sub)">${e.itens||'—'}</td><td style="font-size:12px;color:var(--sub)">${e.vendaId?'#'+e.vendaId:'—'}</td>
-    <td>${badge(lblSt[e.status]||e.status,e.status==='entregue'?'badge-verde':e.status==='em_rota'?'badge-am':'badge-azul')}</td>
-    <td style="font-size:12px;color:var(--sub)">${e.obs||'—'}</td>
-    <td><button class="btn btn-sm btn-ghost" onclick="editarEntrega(${e.id})">Editar</button></td>
-  </tr>`).join('');
+  tbody.innerHTML=lista.map(trEntrega).join('');
 }
 function toggleMotivoReagendamento(){
   const status=document.getElementById('e-status').value;
