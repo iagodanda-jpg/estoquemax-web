@@ -2066,7 +2066,7 @@ function renderVendas(){
     const mv=filtroVend==='todas'||String(v.vendedoraId)===filtroVend;
     const mp=filtroPgto==='todos'||(filtroPgto==='sim'&&v.pgtoRecebido==='sim')||(filtroPgto==='nao'&&v.pgtoRecebido!=='sim');
     return mb&&ms&&mv&&mp;
-  }).sort((a,b)=>(new Date(b.criadoEm||0))-(new Date(a.criadoEm||0))||b.id-a.id);
+  }).sort((a,b)=>(b.dataISO||'').localeCompare(a.dataISO||'')||(new Date(b.criadoEm||0))-(new Date(a.criadoEm||0))||b.id-a.id);
   const vendasAtivas=vendas.filter(v=>v.status!=='cancelado');
   const vendasCanceladas=vendas.filter(v=>v.status==='cancelado');
   const totalVendido=vendasAtivas.reduce((a,v)=>a+v.total,0);
