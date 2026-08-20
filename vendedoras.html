@@ -191,7 +191,14 @@
 
     <!-- ORÇAMENTO -->
     <div id="ab-oc" class="ab">
-      <div class="ca">
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button id="oc-tab-form" onclick="ocView('form')" style="flex:1;border:none;border-radius:10px;padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;background:var(--azul);color:#fff">Novo Orçamento</button>
+        <button id="oc-tab-hist" onclick="ocView('hist')" style="flex:1;border:1.5px solid var(--azul);border-radius:10px;padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;background:transparent;color:var(--azul)">Histórico</button>
+      </div>
+      <div id="oc-hist" style="display:none">
+        <div id="oc-hist-list"></div>
+      </div>
+      <div id="oc-form" class="ca">
         <b style="display:block;margin-bottom:12px">Gerar Orçamento</b>
         <div class="fi"><label>Cliente</label><input id="oc" placeholder="Nome"></div>
         <div class="fi"><label>Telefone</label><input id="otel" placeholder="(00) 00000-0000"></div>
@@ -263,7 +270,8 @@
           <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:var(--sub);font-size:13px">Subtotal:</span><span id="orsub" style="font-weight:600">R$ 0,00</span></div>
           <div style="display:flex;justify-content:space-between"><b>Total:</b><b id="ort" style="color:var(--verde)">R$ 0,00</b></div>
         </div>
-        <button class="bt bp" onclick="gO()">Compartilhar via WhatsApp</button>
+        <button class="bt bs" onclick="salvarOrcamento()" id="bso">Salvar Orçamento (PDF)</button>
+        <button class="bt bg" onclick="gO()" style="margin-bottom:0">Compartilhar via WhatsApp</button>
       </div>
     </div>
 
@@ -289,7 +297,7 @@
 
 <script>
 const SU='https://nuqnlzmmnrrodlalijrb.supabase.co';
-let sb, prods=[], it=[{id:'',n:'',q:1,p:0}], oi=[{id:'',n:'',q:1,p:0}], pid, vid, enm='Iago Estofados', emp={}, vendasCache=[];
+let sb, prods=[], it=[{id:'',n:'',q:1,p:0}], oi=[{id:'',n:'',q:1,p:0}], pid, vid, enm='Iago Estofados', emp={}, vendasCache=[], vnome='', vcomissao=0, orcamentosCache=[];
 let entregasVend=[], semanaOffsetVend=0;
 let empLogoBase64=null;
 async function carregarLogoBase64Vend(url){
@@ -412,7 +420,7 @@ function ir(id){
   if(id==='i') cD();
   if(id==='mv') cMV();
   if(id==='nv'){ rI(); document.getElementById('vpr').min=new Date().toISOString().slice(0,10); }
-  if(id==='oc'){ rO(); if(!document.getElementById('oval').value){ const v=new Date(); v.setDate(v.getDate()+7); document.getElementById('oval').value=v.toISOString().slice(0,10); } }
+  if(id==='oc'){ ocView('form'); rO(); if(!document.getElementById('oval').value){ const v=new Date(); v.setDate(v.getDate()+7); document.getElementById('oval').value=v.toISOString().slice(0,10); } }
   if(id==='cal'){ semanaOffsetVend=0; renderCalVend(); }
   fecharDrawer();
 }
@@ -465,9 +473,9 @@ async function login(){
   const {data:p}=await sb.from('perfis').select('role,nome').eq('id',data.user.id).single();
   if(!p||p.role==='master'){ er.textContent='Use o sistema Master.'; er.style.display='block'; await sb.auth.signOut(); bl.textContent='Entrar'; bl.disabled=false; return; }
   pid=data.user.id;
-  const {data:v}=await sb.from('vendedoras').select('id,nome').eq('perfil_id',pid).single();
-  if(v){ vid=v.id; document.getElementById('nu').textContent=v.nome.split(' ')[0]; }
-  else document.getElementById('nu').textContent=p.nome.split(' ')[0];
+  const {data:v}=await sb.from('vendedoras').select('id,nome,comissao').eq('perfil_id',pid).single();
+  if(v){ vid=v.id; vnome=v.nome; vcomissao=Number(v.comissao||0); document.getElementById('nu').textContent=v.nome.split(' ')[0]; }
+  else { vnome=p.nome; document.getElementById('nu').textContent=p.nome.split(' ')[0]; }
   const {data:e}=await sb.from('empresa').select('*').eq('id',1).maybeSingle();
   if(e){ emp=e; enm=e.nome||enm; document.getElementById('en').textContent=enm; document.getElementById('en-drawer').textContent=enm; if(e.logo_url) empLogoBase64=await carregarLogoBase64Vend(e.logo_url); }
   const {data:prs}=await sb.from('produtos').select('id,nome,preco').eq('ativo',true).order('nome');
@@ -488,12 +496,20 @@ async function cD(){
   if(!pid) return;
   const {data:vs}=await sb.from('vendas').select('*').eq('perfil_vendedora_id',pid).order('criado_em',{ascending:false});
   const l=vs||[];
-  const tot=l.reduce((a,v)=>a+Number(v.total||0),0);
+  const ativas=l.filter(v=>v.status!=='cancelado');
+  const tot=ativas.reduce((a,v)=>a+Number(v.total||0),0);
   const mes=new Date().getMonth(), ano=new Date().getFullYear();
-  const dm=l.filter(v=>{ const d=new Date(v.criado_em); return d.getMonth()===mes && d.getFullYear()===ano; });
+  const dm=ativas.filter(v=>{ const d=new Date(v.criado_em); return d.getMonth()===mes && d.getFullYear()===ano; });
+  const entregues=ativas.filter(v=>v.status==='entregue');
+  const aguardando=ativas.filter(v=>v.status!=='entregue');
+  const recebido=ativas.filter(v=>v.pgto_recebido==='sim').reduce((a,v)=>a+Number(v.total||0),0);
+  const comissaoValor=recebido*(vcomissao/100);
   document.getElementById('kg').innerHTML=[
     {l:'Vendas Mês',v:dm.length,s:fR(dm.reduce((a,v)=>a+Number(v.total||0),0)),c:'#2E6BC4'},
-    {l:'Total Geral',v:l.length,s:fR(tot),c:'#1A7A4A'}
+    {l:'Total Geral',v:ativas.length,s:fR(tot),c:'#1A7A4A'},
+    {l:'Entregues',v:entregues.length,s:'de '+ativas.length+' vendas',c:'#1A7A4A'},
+    {l:'Aguardando Entrega',v:aguardando.length,s:'ainda não entregues',c:'#B45309'},
+    {l:'Comissão a Receber',v:fR(comissaoValor),s:vcomissao+'% sobre '+fR(recebido)+' recebidos',c:'#1E4D8C'}
   ].map(k=>`<div style="background:#fff;border-radius:12px;border:1.5px solid var(--borda);padding:14px;border-left:4px solid ${k.c}"><div style="font-size:10px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">${k.l}</div><div style="font-size:20px;font-weight:800">${k.v}</div><div style="font-size:11px;color:var(--sub);margin-top:3px">${k.s}</div></div>`).join('');
   document.getElementById('uv').innerHTML=l.slice(0,5).map(v=>`<div class="vi"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><div><b>${v.cliente}</b><div style="font-size:11px;color:var(--sub)">${new Date(v.data_venda||v.criado_em).toLocaleDateString('pt-BR')}</div></div><b style="color:var(--verde)">${fR(v.total)}</b></div><span class="badge" style="background:${CL[v.status]||'#DBEAFE'}">${LB[v.status]||v.status}</span></div>`).join('')||'<div style="text-align:center;color:var(--sub);padding:20px">Nenhuma venda</div>';
 }
@@ -509,7 +525,26 @@ async function baixarPedido(id){
 }
 
 // ─── ITENS DE VENDA ────────────────────────────────────────────────────────────
-const so=(selecionadoId)=>prods.map(p=>`<option value="${p.id}"${selecionadoId!=null&&p.id==selecionadoId?' selected':''}>${p.nome} - ${fR(p.preco)}</option>`).join('');
+function buscarProduto(tipo, idx, termo){
+  const box=document.getElementById(`sug-${tipo}-${idx}`); if(!box) return;
+  const t=(termo||'').toLowerCase().trim();
+  const matches=(t?prods.filter(p=>p.nome.toLowerCase().includes(t)):prods).slice(0,40);
+  if(!matches.length){ box.innerHTML='<div style="padding:10px 12px;font-size:13px;color:var(--sub)">Nenhum produto encontrado</div>'; box.style.display='block'; return; }
+  box.innerHTML=matches.map(p=>`<div onmousedown="event.preventDefault()" onclick="selecionarProduto('${tipo}',${idx},${p.id})" style="padding:9px 12px;cursor:pointer;font-size:13.5px;border-bottom:1px solid #F0F4F8">${p.nome} <span style="color:var(--sub);font-size:12px">— ${fR(p.preco)}</span></div>`).join('');
+  box.style.display='block';
+}
+function selecionarProduto(tipo, idx, prodId){
+  const pr=prods.find(x=>x.id==prodId); if(!pr) return;
+  if(tipo==='it'){ it[idx]={id:pr.id,n:pr.nome,q:it[idx].q,p:Number(pr.preco)}; rI(); }
+  else { oi[idx]={id:pr.id,n:pr.nome,q:oi[idx].q,p:Number(pr.preco)}; rO(); }
+}
+function fecharSugestoes(tipo, idx){
+  setTimeout(()=>{
+    const box=document.getElementById(`sug-${tipo}-${idx}`); if(box) box.style.display='none';
+    const arr=tipo==='it'?it:oi; const inp=document.getElementById(`inp-${tipo}-${idx}`);
+    if(inp && arr[idx]) inp.value=arr[idx].n||'';
+  }, 150);
+}
 function calcT(){
   const subtotal=it.filter(i=>i.id).reduce((a,i)=>a+i.q*i.p,0);
   const desc=Number(document.getElementById('vdesc')?.value||0);
@@ -547,14 +582,16 @@ function calcTaxaMaq2(){
   calcT();
 }
 function rI(){
-  document.getElementById('il').innerHTML=it.map((i,idx)=>`<div style="display:grid;grid-template-columns:1fr 55px 30px;gap:6px;margin-bottom:8px;align-items:center">
-    <select onchange="sP(${idx},this.value)"><option value="">Selecione...</option>${so(i.id)}</select>
+  document.getElementById('il').innerHTML=it.map((i,idx)=>`<div style="display:grid;grid-template-columns:1fr 55px 30px;gap:6px;margin-bottom:8px;align-items:start">
+    <div style="position:relative">
+      <input type="text" id="inp-it-${idx}" placeholder="Buscar produto..." value="${(i.n||'').replace(/"/g,'&quot;')}" oninput="buscarProduto('it',${idx},this.value)" onfocus="this.select();buscarProduto('it',${idx},'')" onblur="fecharSugestoes('it',${idx})" autocomplete="off" style="border:1.5px solid var(--borda);border-radius:10px;padding:11px 13px;font-size:14px;width:100%">
+      <div id="sug-it-${idx}" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--borda);border-radius:8px;margin-top:2px;max-height:180px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div>
+    </div>
     <input type="number" min="1" value="${i.q}" onchange="uQ(${idx},this.value)" style="text-align:center">
     <button onclick="it.splice(${idx},1);rI()" style="background:#FEE2E2;border:none;border-radius:8px;color:var(--vm);cursor:pointer;width:30px;height:38px">x</button>
   </div>`).join('');
   calcT();
 }
-function sP(i,p){ const pr=prods.find(x=>x.id==p); it[i]=pr?{id:pr.id,n:pr.nome,q:it[i].q,p:Number(pr.preco)}:{id:'',n:'',q:1,p:0}; rI(); }
 function uQ(i,v){ it[i].q=Math.max(1,Number(v)); rI(); }
 function addI(){ it.push({id:'',n:'',q:1,p:0}); rI(); }
 
@@ -658,6 +695,7 @@ async function gerarPedidoPDF(venda, its){
   const endTxt=[venda.end_rua,venda.end_num,venda.end_cidade,venda.end_estado].filter(Boolean).join(', ');
   if(endTxt){ doc.text('Endereço: '+endTxt, 14, y); y+=6; }
   if(venda.previsao_iso){ doc.text('Previsão de entrega: '+new Date(venda.previsao_iso+'T12:00:00').toLocaleDateString('pt-BR'), 14, y); y+=6; }
+  doc.text('Vendedor(a): '+(vnome||'-'), 14, y); y+=6;
   y+=4;
 
   doc.autoTable({
@@ -702,13 +740,16 @@ async function gerarPedidoPDF(venda, its){
 
 // ─── ORÇAMENTO ─────────────────────────────────────────────────────────────────
 function rO(){
-  document.getElementById('ol').innerHTML=oi.map((i,idx)=>`<div style="display:grid;grid-template-columns:1fr 55px;gap:6px;margin-bottom:8px">
-    <select onchange="sO(${idx},this.value)"><option value="">Selecione...</option>${so(i.id)}</select>
+  document.getElementById('ol').innerHTML=oi.map((i,idx)=>`<div style="display:grid;grid-template-columns:1fr 55px 30px;gap:6px;margin-bottom:8px;align-items:start">
+    <div style="position:relative">
+      <input type="text" id="inp-oi-${idx}" placeholder="Buscar produto..." value="${(i.n||'').replace(/"/g,'&quot;')}" oninput="buscarProduto('oi',${idx},this.value)" onfocus="this.select();buscarProduto('oi',${idx},'')" onblur="fecharSugestoes('oi',${idx})" autocomplete="off" style="border:1.5px solid var(--borda);border-radius:10px;padding:11px 13px;font-size:14px;width:100%">
+      <div id="sug-oi-${idx}" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--borda);border-radius:8px;margin-top:2px;max-height:180px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div>
+    </div>
     <input type="number" min="1" value="${i.q}" onchange="uO(${idx},this.value)" style="text-align:center">
+    <button onclick="oi.splice(${idx},1);rO()" style="background:#FEE2E2;border:none;border-radius:8px;color:var(--vm);cursor:pointer;width:30px;height:38px">x</button>
   </div>`).join('');
   calcO();
 }
-function sO(i,p){ const pr=prods.find(x=>x.id==p); oi[i]=pr?{id:pr.id,n:pr.nome,q:oi[i].q,p:Number(pr.preco)}:{id:'',n:'',q:1,p:0}; rO(); }
 function uO(i,v){ oi[i].q=Math.max(1,Number(v)); rO(); }
 function addO(){ oi.push({id:'',n:'',q:1,p:0}); rO(); }
 
@@ -852,6 +893,183 @@ function gO(){
   window.open('https://wa.me/?text='+encodeURIComponent(tx),'_blank');
 }
 
+// ─── HISTÓRICO DE ORÇAMENTOS ───────────────────────────────────────────────────
+function ocView(v){
+  document.getElementById('oc-form').style.display = v==='form'?'block':'none';
+  document.getElementById('oc-hist').style.display = v==='hist'?'block':'none';
+  const tf=document.getElementById('oc-tab-form'), th=document.getElementById('oc-tab-hist');
+  tf.style.background = v==='form'?'var(--azul)':'transparent'; tf.style.color = v==='form'?'#fff':'var(--azul)';
+  th.style.background = v==='hist'?'var(--azul)':'transparent'; th.style.color = v==='hist'?'#fff':'var(--azul)';
+  if(v==='hist') cOH();
+}
+async function cOH(){
+  const {data:os,error}=await sb.from('orcamentos').select('*').eq('perfil_vendedora_id',pid).order('criado_em',{ascending:false});
+  if(error){ document.getElementById('oc-hist-list').innerHTML=`<div style="text-align:center;color:var(--vm);padding:30px;font-size:13px">Erro ao carregar histórico: ${error.message}</div>`; return; }
+  orcamentosCache=os||[];
+  document.getElementById('oc-hist-list').innerHTML=orcamentosCache.length?orcamentosCache.map(o=>{
+    const statusBadge = o.status==='convertido' ? `<span class="badge" style="background:#DCFCE7;color:#166534">Virou Pedido${o.venda_id?' #'+o.venda_id:''}</span>` : '<span class="badge" style="background:#FEF9C3;color:#92400E">Em aberto</span>';
+    return `<div class="vi">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+        <div><b>${o.cliente}</b><div style="font-size:11px;color:var(--sub)">${new Date(o.criado_em).toLocaleDateString('pt-BR')}${o.validade?' · válido até '+new Date(o.validade+'T12:00:00').toLocaleDateString('pt-BR'):''}</div></div>
+        <b style="color:var(--verde)">${fR(o.total)}</b>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
+        ${statusBadge}
+        <div style="display:flex;gap:6px">
+          <button onclick="baixarOrcamentoPDF(${o.id})" style="background:#EFF6FF;border:1px solid #BFDBFE;color:#1E4D8C;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer">📄 PDF</button>
+          ${o.status!=='convertido'?`<button onclick="converterOrcamentoEmPedido(${o.id})" style="background:#DCFCE7;border:1px solid #BBF7D0;color:#166534;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer">✔ Virou Pedido</button>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('') : '<div style="text-align:center;color:var(--sub);padding:30px">Nenhum orçamento salvo ainda</div>';
+}
+async function salvarOrcamento(){
+  const c=document.getElementById('oc').value.trim(), its=oi.filter(i=>i.id).map(i=>({id:i.id,nome:i.n,qtd:i.q,preco:i.p}));
+  if(!c||!its.length) return alert('Informe o cliente e produtos');
+  const btn=document.getElementById('bso'); btn.textContent='...'; btn.disabled=true;
+  const subtotal=its.reduce((a,i)=>a+i.qtd*i.preco,0);
+  const descRaw=Number(document.getElementById('odesc').value||0);
+  const descModo=document.getElementById('odescmodo').value;
+  const descValor=descModo==='%'?subtotal*(descRaw/100):descRaw;
+  const total=Math.max(0,subtotal-descValor);
+  const pgto=document.getElementById('op').value;
+  const bandeira=document.getElementById('oband')?.value||'';
+  const parcelas=document.getElementById('oparc')?.value||'';
+  const dividir=document.getElementById('odividir')?.checked;
+  const valor2Raw=dividir?Number(document.getElementById('ovalor2')?.value||0):0;
+  const valor2=Math.min(Math.max(0,valor2Raw),total);
+  const valor1=total-valor2;
+  const usaMaq=['Pix Maquininha','Cartão Débito','Cartão Crédito','Parcelado','Link de Pagamento'].includes(pgto);
+  const taxaPct=usaMaq?getTaxaPct(pgto, pgto==='Pix Maquininha'?'pix':pgto==='Link de Pagamento'?'link':bandeira, parcelas):0;
+  const taxaValor=valor1*(taxaPct/100);
+  let pgto2='', bandeira2='', parcelas2='', taxaPct2=0, taxaValor2=0;
+  if(dividir && valor2>0){
+    pgto2=document.getElementById('op2').value;
+    bandeira2=document.getElementById('oband2')?.value||'';
+    parcelas2=document.getElementById('oparc2')?.value||'';
+    const usaMaq2=['Pix Maquininha','Cartão Débito','Cartão Crédito','Parcelado','Link de Pagamento'].includes(pgto2);
+    taxaPct2=usaMaq2?getTaxaPct(pgto2, pgto2==='Pix Maquininha'?'pix':pgto2==='Link de Pagamento'?'link':bandeira2, parcelas2):0;
+    taxaValor2=valor2*(taxaPct2/100);
+    bandeira2=usaMaq2?bandeira2:''; parcelas2=usaMaq2?parcelas2:'';
+  }
+  const endRua=document.getElementById('orua').value, endNum=document.getElementById('onum').value;
+  const endCidade=document.getElementById('ocid').value, endEstado=document.getElementById('ouf').value.toUpperCase();
+  const row={
+    cliente:c, tel:document.getElementById('otel').value, cpf:document.getElementById('ocpf').value,
+    end_rua:endRua, end_num:endNum, end_cidade:endCidade, end_estado:endEstado,
+    itens:its, subtotal, desconto:descValor, desconto_raw:descRaw, desconto_modo:descModo, total,
+    pgto, bandeira:usaMaq?bandeira:'', parcelas:usaMaq?String(parcelas):null,
+    taxa_pct:usaMaq?taxaPct:0, taxa_valor:usaMaq?taxaValor:0,
+    pgto2:(dividir&&valor2>0)?pgto2:'', bandeira2, parcelas2, taxa_pct2:taxaPct2, taxa_valor2:taxaValor2, valor2:(dividir?valor2:0),
+    validade:document.getElementById('oval').value||null, obs:document.getElementById('oo').value,
+    vendedora_id:vid||null, perfil_vendedora_id:pid, status:'aberto'
+  };
+  const {data,error}=await sb.from('orcamentos').insert(row).select().single();
+  btn.textContent='Salvar Orçamento (PDF)'; btn.disabled=false;
+  if(error){ alert('Erro ao salvar orçamento: '+error.message); return; }
+  await gerarOrcamentoPDF(data, its);
+  oi=[{id:'',n:'',q:1,p:0}];
+  ['oc','otel','ocpf','orua','onum','ocid','ouf','oo','odesc','ovalor2'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('odividir').checked=false;
+  document.getElementById('oblocomaq2').style.display='none';
+  rO();
+  alert('Orçamento salvo! Você pode encontrá-lo depois em Histórico.');
+}
+async function baixarOrcamentoPDF(id){
+  const o=orcamentosCache.find(x=>x.id===id);
+  if(!o) return alert('Orçamento não encontrado.');
+  await gerarOrcamentoPDF(o, o.itens||[]);
+}
+async function converterOrcamentoEmPedido(id){
+  const o=orcamentosCache.find(x=>x.id===id);
+  if(!o) return alert('Orçamento não encontrado.');
+  if(!confirm('Transformar este orçamento em pedido? Isso vai criar uma venda com os mesmos dados.')) return;
+  const row={
+    cliente:o.cliente, tel:o.tel||'', cpf:o.cpf||'',
+    end_rua:o.end_rua||'', end_num:o.end_num||'', end_cidade:o.end_cidade||'', end_estado:o.end_estado||'',
+    itens:o.itens, subtotal:o.subtotal, desconto:o.desconto, desconto_raw:o.desconto_raw, desconto_modo:o.desconto_modo,
+    total:o.total, pgto:o.pgto, bandeira:o.bandeira||'', parcelas:o.parcelas||null,
+    taxa_pct:o.taxa_pct||0, taxa_valor:o.taxa_valor||0,
+    valor_liquido:(o.total-(o.taxa_valor||0)-(o.taxa_valor2||0)),
+    pgto2:o.pgto2||'', bandeira2:o.bandeira2||'', parcelas2:o.parcelas2||'', taxa_pct2:o.taxa_pct2||0, taxa_valor2:o.taxa_valor2||0, valor2:o.valor2||0,
+    pgto_recebido:'nao', vendedora_id:vid||null, perfil_vendedora_id:pid,
+    status:'pendente', previsao_iso:null, obs:o.obs||'',
+    data_venda:new Date().toISOString().slice(0,10)
+  };
+  const {data,error}=await sb.from('vendas').insert(row).select().single();
+  if(error){ alert('Erro ao criar o pedido: '+error.message); return; }
+  const {error:errUpd}=await sb.from('orcamentos').update({status:'convertido', venda_id:data.id}).eq('id',id);
+  if(errUpd) alert('Pedido criado, mas não consegui marcar o orçamento como convertido: '+errUpd.message);
+  await cOH();
+  await gerarPedidoPDF(data, o.itens||[]);
+}
+async function gerarOrcamentoPDF(orc, its){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const W = 210;
+  doc.setFillColor(30,77,140); doc.rect(0,0,W,26,'F');
+  let textX = 14;
+  if(empLogoBase64){
+    try{
+      const fmt = empLogoBase64.includes('image/png') ? 'PNG' : empLogoBase64.includes('image/webp') ? 'WEBP' : 'JPEG';
+      doc.addImage(empLogoBase64, fmt, 14, 4, 18, 18);
+      textX = 36;
+    } catch(e){}
+  }
+  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(15);
+  doc.text(enm, textX, 12);
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  const sub2 = [emp.cnpj, emp.tel, emp.email].filter(Boolean).join('  ·  ') || 'Controle de Estofados';
+  doc.text(sub2, textX, 18);
+  doc.setFontSize(7.5); doc.text(emp.endereco || ('Emitido em '+new Date().toLocaleString('pt-BR')), textX, 23);
+
+  doc.setTextColor(30,40,64); doc.setFontSize(15); doc.setFont('helvetica','bold');
+  doc.text('Orçamento #'+orc.id, 14, 36);
+
+  doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(30,40,64);
+  doc.text('Cliente: '+orc.cliente, 14, 46);
+  doc.setFont('helvetica','normal'); doc.setTextColor(90,106,138);
+  let y=52;
+  if(orc.tel){ doc.text('Telefone: '+orc.tel, 14, y); y+=6; }
+  if(orc.cpf){ doc.text('CPF: '+orc.cpf, 14, y); y+=6; }
+  const endTxt=[orc.end_rua,orc.end_num,orc.end_cidade,orc.end_estado].filter(Boolean).join(', ');
+  if(endTxt){ doc.text('Endereço: '+endTxt, 14, y); y+=6; }
+  doc.text('Vendedor(a): '+(vnome||'-'), 14, y); y+=6;
+  y+=4;
+
+  doc.autoTable({
+    startY:y, margin:{left:14,right:14},
+    head:[['Qtd','Produto','Preço','Subtotal']],
+    body: its.map(i=>[i.qtd, i.nome, fR(i.preco), fR(i.qtd*i.preco)]),
+    styles:{fontSize:10,cellPadding:4}, headStyles:{fillColor:[30,77,140],textColor:255,fontStyle:'bold'},
+    alternateRowStyles:{fillColor:[240,244,248]}
+  });
+  y = doc.lastAutoTable.finalY + 8;
+  if(orc.desconto>0){ doc.setFontSize(10); doc.setTextColor(185,28,28); doc.text('Desconto: -'+fR(orc.desconto), 14, y); y+=7; }
+  doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(26,122,74);
+  doc.text('Total: '+fR(orc.total), 14, y); y+=8;
+  doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.setTextColor(90,106,138);
+  const pgtoTxt = [orc.pgto, orc.pgto2].filter(Boolean).join(' + ');
+  doc.text('Forma de pagamento: '+pgtoTxt, 14, y); y+=6;
+  if(orc.validade){ doc.text('Válido até: '+new Date(orc.validade+'T12:00:00').toLocaleDateString('pt-BR'), 14, y); y+=6; }
+  if(orc.obs){ doc.text('Observações: '+orc.obs, 14, y); y+=6; }
+
+  doc.setDrawColor(209,217,230); doc.setLineWidth(0.3); doc.line(14, 284, W-14, 284);
+  doc.setFontSize(7.5); doc.setTextColor(90,106,138);
+  doc.text(enm, 14, 289);
+  doc.text('Documento gerado pelo EstoqueMax', W-14, 289, {align:'right'});
+
+  const nomeArquivo = `orcamento-${orc.id}-${(orc.cliente||'').replace(/[^a-zA-Z0-9]/g,'-')}.pdf`;
+  const blob = doc.output('blob');
+  if(navigator.canShare && navigator.canShare({files:[new File([blob], nomeArquivo, {type:'application/pdf'})]})){
+    try{
+      await navigator.share({ files:[new File([blob], nomeArquivo, {type:'application/pdf'})], title:'Orçamento #'+orc.id, text:'Segue o orçamento de '+orc.cliente });
+      return;
+    } catch(e){ /* usuário cancelou o compartilhamento, cai no download */ }
+  }
+  doc.save(nomeArquivo);
+}
+
 // ─── INIT ────────────────────────────────────────────────────────────────────
 (async ()=>{
   const cfg=await fetch('/api/config').then(r=>r.json()).catch(()=>({supabaseAnon:''}));
@@ -861,9 +1079,9 @@ function gO(){
     pid=session.user.id;
     const {data:p}=await sb.from('perfis').select('role,nome').eq('id',pid).single();
     if(p && p.role!=='master'){
-      const {data:v}=await sb.from('vendedoras').select('id,nome').eq('perfil_id',pid).single();
-      if(v){ vid=v.id; document.getElementById('nu').textContent=v.nome.split(' ')[0]; }
-      else document.getElementById('nu').textContent=p.nome.split(' ')[0];
+      const {data:v}=await sb.from('vendedoras').select('id,nome,comissao').eq('perfil_id',pid).single();
+      if(v){ vid=v.id; vnome=v.nome; vcomissao=Number(v.comissao||0); document.getElementById('nu').textContent=v.nome.split(' ')[0]; }
+      else { vnome=p.nome; document.getElementById('nu').textContent=p.nome.split(' ')[0]; }
       const {data:e}=await sb.from('empresa').select('*').eq('id',1).maybeSingle();
       if(e){ emp=e; enm=e.nome||enm; document.getElementById('en').textContent=enm; document.getElementById('en-drawer').textContent=enm; if(e.logo_url) empLogoBase64=await carregarLogoBase64Vend(e.logo_url); }
       const {data:prs}=await sb.from('produtos').select('id,nome,preco').eq('ativo',true).order('nome');
