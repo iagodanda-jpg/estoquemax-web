@@ -582,17 +582,19 @@ function calcTaxaMaq2(){
   calcT();
 }
 function rI(){
-  document.getElementById('il').innerHTML=it.map((i,idx)=>`<div style="display:grid;grid-template-columns:1fr 55px 30px;gap:6px;margin-bottom:8px;align-items:start">
+  document.getElementById('il').innerHTML=it.map((i,idx)=>`<div style="display:grid;grid-template-columns:1fr 50px 70px 30px;gap:6px;margin-bottom:8px;align-items:start">
     <div style="position:relative">
       <input type="text" id="inp-it-${idx}" placeholder="Buscar produto..." value="${(i.n||'').replace(/"/g,'&quot;')}" oninput="buscarProduto('it',${idx},this.value)" onfocus="this.select();buscarProduto('it',${idx},'')" onblur="fecharSugestoes('it',${idx})" autocomplete="off" style="border:1.5px solid var(--borda);border-radius:10px;padding:11px 13px;font-size:14px;width:100%">
       <div id="sug-it-${idx}" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--borda);border-radius:8px;margin-top:2px;max-height:180px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div>
     </div>
     <input type="number" min="1" value="${i.q}" onchange="uQ(${idx},this.value)" style="text-align:center">
+    <input type="number" min="0" step="0.01" value="${i.p||0}" onchange="uPr(${idx},this.value)" ${i.id?'':'disabled'} title="Preço unitário" style="text-align:center">
     <button onclick="it.splice(${idx},1);rI()" style="background:#FEE2E2;border:none;border-radius:8px;color:var(--vm);cursor:pointer;width:30px;height:38px">x</button>
   </div>`).join('');
   calcT();
 }
 function uQ(i,v){ it[i].q=Math.max(1,Number(v)); rI(); }
+function uPr(i,v){ it[i].p=Math.max(0,Number(v)||0); rI(); }
 function addI(){ it.push({id:'',n:'',q:1,p:0}); rI(); }
 
 async function reg(){
@@ -740,17 +742,19 @@ async function gerarPedidoPDF(venda, its){
 
 // ─── ORÇAMENTO ─────────────────────────────────────────────────────────────────
 function rO(){
-  document.getElementById('ol').innerHTML=oi.map((i,idx)=>`<div style="display:grid;grid-template-columns:1fr 55px 30px;gap:6px;margin-bottom:8px;align-items:start">
+  document.getElementById('ol').innerHTML=oi.map((i,idx)=>`<div style="display:grid;grid-template-columns:1fr 50px 70px 30px;gap:6px;margin-bottom:8px;align-items:start">
     <div style="position:relative">
       <input type="text" id="inp-oi-${idx}" placeholder="Buscar produto..." value="${(i.n||'').replace(/"/g,'&quot;')}" oninput="buscarProduto('oi',${idx},this.value)" onfocus="this.select();buscarProduto('oi',${idx},'')" onblur="fecharSugestoes('oi',${idx})" autocomplete="off" style="border:1.5px solid var(--borda);border-radius:10px;padding:11px 13px;font-size:14px;width:100%">
       <div id="sug-oi-${idx}" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--borda);border-radius:8px;margin-top:2px;max-height:180px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div>
     </div>
     <input type="number" min="1" value="${i.q}" onchange="uO(${idx},this.value)" style="text-align:center">
+    <input type="number" min="0" step="0.01" value="${i.p||0}" onchange="uOPr(${idx},this.value)" ${i.id?'':'disabled'} title="Preço unitário" style="text-align:center">
     <button onclick="oi.splice(${idx},1);rO()" style="background:#FEE2E2;border:none;border-radius:8px;color:var(--vm);cursor:pointer;width:30px;height:38px">x</button>
   </div>`).join('');
   calcO();
 }
 function uO(i,v){ oi[i].q=Math.max(1,Number(v)); rO(); }
+function uOPr(i,v){ oi[i].p=Math.max(0,Number(v)||0); rO(); }
 function addO(){ oi.push({id:'',n:'',q:1,p:0}); rO(); }
 
 // ─── PAGAMENTO NO ORÇAMENTO (espelha Nova Venda) ──────────────────────────────

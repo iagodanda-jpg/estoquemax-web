@@ -2301,7 +2301,7 @@ function editarVenda(id){
 function renderItensVenda(){
   const wrap=document.getElementById('itens-venda-lista');
   wrap.innerHTML=itensVendaTemp.map((item,i)=>`
-    <div style="display:grid;grid-template-columns:1fr 70px 90px 28px;gap:8px;margin-bottom:8px;align-items:end">
+    <div style="display:grid;grid-template-columns:1fr 55px 85px 90px 28px;gap:8px;margin-bottom:8px;align-items:end">
       <div class="field" style="margin:0">${i===0?'<label>Produto</label>':''}
         <select onchange="selecionarProdVenda(${i},this.value)" style="border:1.5px solid var(--borda);border-radius:8px;padding:8px 10px;font-size:13px;width:100%">
           <option value="">Selecione...</option>
@@ -2309,6 +2309,8 @@ function renderItensVenda(){
         </select></div>
       <div class="field" style="margin:0">${i===0?'<label>Qtd</label>':''}
         <input type="number" min="1" value="${item.qtd}" onchange="atualizarQtdVenda(${i},this.value)" style="border:1.5px solid var(--borda);border-radius:8px;padding:8px;font-size:13px;width:100%"></div>
+      <div class="field" style="margin:0">${i===0?'<label>Preço Unit.</label>':''}
+        <input type="number" min="0" step="0.01" value="${item.preco||0}" onchange="atualizarPrecoVenda(${i},this.value)" ${item.id?'':'disabled'} style="border:1.5px solid var(--borda);border-radius:8px;padding:8px;font-size:13px;width:100%"></div>
       <div style="${i===0?'padding-top:18px':''}font-weight:700;font-size:13px;color:var(--verde);display:flex;align-items:center">${fmtR(item.qtd*(item.preco||0))}</div>
       <button onclick="removerItemVenda(${i})" style="background:none;border:1.5px solid var(--borda);border-radius:6px;padding:6px;cursor:pointer;font-size:14px;height:36px;${i===0?'margin-top:18px':''}">&times;</button>
     </div>`).join('');
@@ -2323,6 +2325,7 @@ function selecionarProdVenda(i,pid){
   renderItensVenda();
 }
 function atualizarQtdVenda(i,v){ itensVendaTemp[i].qtd=Math.max(1,Number(v)); renderItensVenda(); }
+function atualizarPrecoVenda(i,v){ itensVendaTemp[i].preco=Math.max(0,Number(v)||0); renderItensVenda(); }
 
 async function ajustarEstoqueVenda(itens, sinal){
   for(const item of itens){
