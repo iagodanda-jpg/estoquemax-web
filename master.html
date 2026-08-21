@@ -942,12 +942,20 @@
     <div class="modal-header"><h2 id="modal-posvenda-titulo">Novo Registro de Pós-venda</h2><button onclick="fecharModal('posvenda')">&times;</button></div>
     <div class="modal-body">
       <div class="field"><label>Venda de Origem (opcional)</label>
-        <select id="pv-venda" onchange="preencherPosVendaDaVenda()"><option value="">— Avulso (sem venda vinculada) —</option></select>
+        <div style="position:relative">
+          <input type="text" id="pv-venda-busca" placeholder="Buscar por cliente ou número da venda..." oninput="buscarVendaPosVenda(this.value)" onfocus="this.select();buscarVendaPosVenda('')" onblur="fecharSugPosVenda('venda')" autocomplete="off">
+          <input type="hidden" id="pv-venda">
+          <div id="sug-pv-venda" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--borda);border-radius:8px;margin-top:2px;max-height:220px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div>
+        </div>
       </div>
       <div class="field"><label>Cliente</label><input id="pv-cliente" placeholder="Nome do cliente"></div>
       <div class="grid2">
         <div class="field"><label>Produto</label>
-          <select id="pv-produto" onchange="onProdutoPosVendaChange()"><option value="">— Nenhum / não listado —</option></select>
+          <div style="position:relative">
+            <input type="text" id="pv-produto-busca" placeholder="Buscar produto..." oninput="buscarProdutoPosVenda(this.value)" onfocus="this.select();buscarProdutoPosVenda('')" onblur="fecharSugPosVenda('produto')" autocomplete="off">
+            <input type="hidden" id="pv-produto">
+            <div id="sug-pv-produto" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--borda);border-radius:8px;margin-top:2px;max-height:220px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div>
+          </div>
         </div>
         <div class="field"><label>Nome do Produto</label><input id="pv-produto-nome" placeholder="Se não estiver na lista"></div>
       </div>
@@ -1799,12 +1807,45 @@ function renderPosVendas(){
     </div></td></tr>`).join('');
 }
 function popularSelectsPosVenda(){
-  const selVenda=document.getElementById('pv-venda');
-  if(selVenda) selVenda.innerHTML='<option value="">— Avulso (sem venda vinculada) —</option>'+vendas.map(v=>`<option value="${v.id}">#${v.id} – ${v.cliente} (${v.data})</option>`).join('');
-  const selProd=document.getElementById('pv-produto');
-  if(selProd) selProd.innerHTML='<option value="">— Nenhum / não listado —</option>'+produtos.map(p=>`<option value="${p.id}">${p.nome}</option>`).join('');
   const selVend=document.getElementById('pv-vendedora');
   if(selVend) selVend.innerHTML='<option value="">— Nenhuma —</option>'+vendedoras.map(v=>`<option value="${v.id}">${v.nome}</option>`).join('');
+}
+function buscarVendaPosVenda(termo){
+  const box=document.getElementById('sug-pv-venda'); if(!box) return;
+  const t=(termo||'').toLowerCase().trim();
+  const matches=(t?vendas.filter(v=>v.cliente.toLowerCase().includes(t)||String(v.id).includes(t)):vendas).slice(0,40);
+  let html='<div onmousedown="event.preventDefault()" onclick="selecionarVendaPosVenda(\'\')" style="padding:9px 12px;cursor:pointer;font-size:13px;color:var(--sub);border-bottom:1px solid var(--fundo)">— Avulso (sem venda vinculada) —</div>';
+  html += matches.length ? matches.map(v=>`<div onmousedown="event.preventDefault()" onclick="selecionarVendaPosVenda(${v.id})" style="padding:9px 12px;cursor:pointer;font-size:13.5px;border-bottom:1px solid var(--fundo)">#${v.id} – ${v.cliente} <span style="color:var(--sub);font-size:12px">(${v.data})</span></div>`).join('') : '<div style="padding:10px 12px;font-size:13px;color:var(--sub)">Nenhuma venda encontrada</div>';
+  box.innerHTML=html;
+  box.style.display='block';
+}
+function selecionarVendaPosVenda(id){
+  document.getElementById('pv-venda').value=id;
+  if(id===''){ document.getElementById('pv-venda-busca').value=''; document.getElementById('sug-pv-venda').style.display='none'; return; }
+  const v=vendas.find(x=>x.id==id);
+  document.getElementById('pv-venda-busca').value=v?`#${v.id} – ${v.cliente} (${v.data})`:'';
+  document.getElementById('sug-pv-venda').style.display='none';
+  preencherPosVendaDaVenda();
+}
+function buscarProdutoPosVenda(termo){
+  const box=document.getElementById('sug-pv-produto'); if(!box) return;
+  const t=(termo||'').toLowerCase().trim();
+  const matches=(t?produtos.filter(p=>p.nome.toLowerCase().includes(t)):produtos).slice(0,40);
+  let html='<div onmousedown="event.preventDefault()" onclick="selecionarProdutoPosVenda(\'\')" style="padding:9px 12px;cursor:pointer;font-size:13px;color:var(--sub);border-bottom:1px solid var(--fundo)">— Nenhum / não listado —</div>';
+  html += matches.length ? matches.map(p=>`<div onmousedown="event.preventDefault()" onclick="selecionarProdutoPosVenda(${p.id})" style="padding:9px 12px;cursor:pointer;font-size:13.5px;border-bottom:1px solid var(--fundo)">${p.nome}</div>`).join('') : '<div style="padding:10px 12px;font-size:13px;color:var(--sub)">Nenhum produto encontrado</div>';
+  box.innerHTML=html;
+  box.style.display='block';
+}
+function selecionarProdutoPosVenda(id){
+  document.getElementById('pv-produto').value=id;
+  if(id===''){ document.getElementById('pv-produto-busca').value=''; document.getElementById('sug-pv-produto').style.display='none'; return; }
+  const p=produtos.find(x=>x.id==id);
+  document.getElementById('pv-produto-busca').value=p?p.nome:'';
+  document.getElementById('sug-pv-produto').style.display='none';
+  onProdutoPosVendaChange();
+}
+function fecharSugPosVenda(tipo){
+  setTimeout(()=>{ const box=document.getElementById('sug-pv-'+tipo); if(box) box.style.display='none'; }, 150);
 }
 function preencherPosVendaDaVenda(){
   const vid=document.getElementById('pv-venda').value;
@@ -1828,7 +1869,9 @@ function abrirModalPosVenda(){
   popularSelectsPosVenda();
   ['pv-cliente','pv-produto-nome','pv-tipo','pv-prazo','pv-custo','pv-obs'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('pv-venda').value='';
+  document.getElementById('pv-venda-busca').value='';
   document.getElementById('pv-produto').value='';
+  document.getElementById('pv-produto-busca').value='';
   document.getElementById('pv-vendedora').value='';
   document.getElementById('pv-status').value='aberto';
   document.getElementById('modal-posvenda').classList.add('open');
@@ -1839,8 +1882,12 @@ function editarPosVenda(id){
   document.getElementById('modal-posvenda-titulo').textContent='Editar Registro de Pós-venda';
   popularSelectsPosVenda();
   document.getElementById('pv-venda').value=p.venda_id||'';
+  const vOrig=p.venda_id?vendas.find(v=>v.id==p.venda_id):null;
+  document.getElementById('pv-venda-busca').value=vOrig?`#${vOrig.id} – ${vOrig.cliente} (${vOrig.data})`:'';
   document.getElementById('pv-cliente').value=p.cliente||'';
   document.getElementById('pv-produto').value=p.produto_id||'';
+  const prodOrig=p.produto_id?produtos.find(x=>x.id==p.produto_id):null;
+  document.getElementById('pv-produto-busca').value=prodOrig?prodOrig.nome:'';
   document.getElementById('pv-produto-nome').value=p.produto_nome||'';
   document.getElementById('pv-tipo').value=p.tipo_conserto||'';
   document.getElementById('pv-prazo').value=p.prazo||'';
