@@ -535,8 +535,8 @@ function buscarProduto(tipo, idx, termo){
 }
 function selecionarProduto(tipo, idx, prodId){
   const pr=prods.find(x=>x.id==prodId); if(!pr) return;
-  if(tipo==='it'){ it[idx]={id:pr.id,n:pr.nome,q:it[idx].q,p:Number(pr.preco)}; rI(); }
-  else { oi[idx]={id:pr.id,n:pr.nome,q:oi[idx].q,p:Number(pr.preco)}; rO(); }
+  if(tipo==='it'){ it[idx]={id:pr.id,n:pr.nome,q:it[idx].q,p:Number(pr.preco),pMin:Number(pr.preco)}; rI(); }
+  else { oi[idx]={id:pr.id,n:pr.nome,q:oi[idx].q,p:Number(pr.preco),pMin:Number(pr.preco)}; rO(); }
 }
 function fecharSugestoes(tipo, idx){
   setTimeout(()=>{
@@ -588,13 +588,18 @@ function rI(){
       <div id="sug-it-${idx}" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--borda);border-radius:8px;margin-top:2px;max-height:180px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div>
     </div>
     <input type="number" min="1" value="${i.q}" onchange="uQ(${idx},this.value)" style="text-align:center">
-    <input type="number" min="0" step="0.01" value="${i.p||0}" onchange="uPr(${idx},this.value)" ${i.id?'':'disabled'} title="Preço unitário" style="text-align:center">
+    <input type="number" min="${i.pMin||0}" step="0.01" value="${i.p||0}" onchange="uPr(${idx},this.value)" ${i.id?'':'disabled'} title="Preço unitário (mínimo: preço cadastrado)" style="text-align:center">
     <button onclick="it.splice(${idx},1);rI()" style="background:#FEE2E2;border:none;border-radius:8px;color:var(--vm);cursor:pointer;width:30px;height:38px">x</button>
   </div>`).join('');
   calcT();
 }
 function uQ(i,v){ it[i].q=Math.max(1,Number(v)); rI(); }
-function uPr(i,v){ it[i].p=Math.max(0,Number(v)||0); rI(); }
+function uPr(i,v){
+  const floor=it[i].pMin||0, val=Number(v)||0;
+  if(val<floor){ alert('O preço não pode ficar abaixo do valor cadastrado ('+fR(floor)+'). Para reduzir, use o campo Desconto.'); it[i].p=floor; }
+  else it[i].p=val;
+  rI();
+}
 function addI(){ it.push({id:'',n:'',q:1,p:0}); rI(); }
 
 async function reg(){
@@ -748,13 +753,18 @@ function rO(){
       <div id="sug-oi-${idx}" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--borda);border-radius:8px;margin-top:2px;max-height:180px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div>
     </div>
     <input type="number" min="1" value="${i.q}" onchange="uO(${idx},this.value)" style="text-align:center">
-    <input type="number" min="0" step="0.01" value="${i.p||0}" onchange="uOPr(${idx},this.value)" ${i.id?'':'disabled'} title="Preço unitário" style="text-align:center">
+    <input type="number" min="${i.pMin||0}" step="0.01" value="${i.p||0}" onchange="uOPr(${idx},this.value)" ${i.id?'':'disabled'} title="Preço unitário (mínimo: preço cadastrado)" style="text-align:center">
     <button onclick="oi.splice(${idx},1);rO()" style="background:#FEE2E2;border:none;border-radius:8px;color:var(--vm);cursor:pointer;width:30px;height:38px">x</button>
   </div>`).join('');
   calcO();
 }
 function uO(i,v){ oi[i].q=Math.max(1,Number(v)); rO(); }
-function uOPr(i,v){ oi[i].p=Math.max(0,Number(v)||0); rO(); }
+function uOPr(i,v){
+  const floor=oi[i].pMin||0, val=Number(v)||0;
+  if(val<floor){ alert('O preço não pode ficar abaixo do valor cadastrado ('+fR(floor)+'). Para reduzir, use o campo Desconto.'); oi[i].p=floor; }
+  else oi[i].p=val;
+  rO();
+}
 function addO(){ oi.push({id:'',n:'',q:1,p:0}); rO(); }
 
 // ─── PAGAMENTO NO ORÇAMENTO (espelha Nova Venda) ──────────────────────────────
