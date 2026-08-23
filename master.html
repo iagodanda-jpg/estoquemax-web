@@ -1759,7 +1759,7 @@ function renderFuncionarios(){
   const tbody=document.getElementById('tbody-funcionarios');
   if(!lista.length){ tbody.innerHTML=`<tr><td colspan="7" class="sem-dados">Nenhum funcionário cadastrado.</td></tr>`; return; }
   tbody.innerHTML=lista.map(f=>`<tr>
-    <td><b>${f.nome}</b></td>
+    <td><b>${f.nome}</b>${f.vendedora_id?`<div style="font-size:10.5px;color:var(--verde);font-weight:600">🔗 vinculado às Vendedoras</div>`:''}</td>
     <td>${badge(f.tipo,'badge-azul')}</td>
     <td style="font-size:12px">${f.vinculo==='terceirizado'?badge('Terceirizado','badge-am'):badge('Registrado','badge-verde')}</td>
     <td style="color:var(--sub)">${f.telefone||'—'}</td>
@@ -1813,24 +1813,58 @@ async function salvarFuncionario(){
     obs:document.getElementById('func-obs').value
   };
   const btn=document.getElementById('btn-salvar-funcionario'); btn.disabled=true;
+  let funcSalvo;
   if(editandoFuncionario){
     const {data,error}=await sb.from('funcionarios').update(obj).eq('id',editandoFuncionario).select().single();
     btn.disabled=false;
     if(error){ alert('Erro: '+error.message); return; }
+    funcSalvo=data;
     funcionarios=funcionarios.map(f=>f.id===editandoFuncionario?data:f);
   } else {
     const {data,error}=await sb.from('funcionarios').insert(obj).select().single();
     btn.disabled=false;
     if(error){ alert('Erro: '+error.message); return; }
+    funcSalvo=data;
     funcionarios.push(data);
   }
-  fecharModal('funcionario'); renderFuncionarios();
+  await sincronizarVendedoraDoFuncionario(funcSalvo);
+  fecharModal('funcionario'); renderFuncionarios(); popularSelectVendedoras();
+}
+async function sincronizarVendedoraDoFuncionario(func){
+  if(func.tipo!=='Vendedora') return;
+  const payload={ nome:func.nome, tel:func.telefone||'', email:func.email||'', comissao:func.comissao||0 };
+  if(func.vendedora_id){
+    const {error}=await sb.from('vendedoras').update(payload).eq('id',func.vendedora_id);
+    if(error){ alert('Funcionário salvo, mas não consegui atualizar os dados dela na lista de Vendedoras: '+error.message); return; }
+    vendedoras=vendedoras.map(v=>v.id===func.vendedora_id?{...v,...payload}:v);
+    return;
+  }
+  const existente=vendedoras.find(v=>v.nome.trim().toLowerCase()===func.nome.trim().toLowerCase());
+  if(existente){
+    const {error}=await sb.from('vendedoras').update(payload).eq('id',existente.id);
+    if(!error) vendedoras=vendedoras.map(v=>v.id===existente.id?{...v,...payload}:v);
+    const {error:errLink}=await sb.from('funcionarios').update({vendedora_id:existente.id}).eq('id',func.id);
+    if(!errLink){ func.vendedora_id=existente.id; funcionarios=funcionarios.map(f=>f.id===func.id?{...f,vendedora_id:existente.id}:f); }
+    return;
+  }
+  const {data,error}=await sb.from('vendedoras').insert(payload).select().single();
+  if(error){ alert('Funcionário salvo, mas não consegui criar o acesso dela na lista de Vendedoras: '+error.message); return; }
+  vendedoras.push(data);
+  const {error:errLink}=await sb.from('funcionarios').update({vendedora_id:data.id}).eq('id',func.id);
+  if(!errLink){ func.vendedora_id=data.id; funcionarios=funcionarios.map(f=>f.id===func.id?{...f,vendedora_id:data.id}:f); }
 }
 async function excluirFuncionario(id){
-  if(!confirm('Excluir este funcionário?')) return;
+  const f=funcionarios.find(x=>x.id===id); if(!f) return;
+  const aviso=f.vendedora_id?'\n\nEssa pessoa também será removida da lista de Vendedoras (perde o acesso a vendas/comissão daqui pra frente, mas o histórico de vendas antigas não é apagado).':'';
+  if(!confirm('Excluir este funcionário?'+aviso)) return;
   const {data:apagados, error}=await sb.from('funcionarios').delete().eq('id',id).select('id');
   if(error){ alert('Erro: '+error.message); return; }
   if(!apagados || !apagados.length){ alert('Funcionário não excluído: falta permissão no banco (RLS).'); return; }
+  if(f.vendedora_id){
+    const {error:errV}=await sb.from('vendedoras').delete().eq('id',f.vendedora_id);
+    if(!errV){ vendedoras=vendedoras.filter(v=>v.id!==f.vendedora_id); popularSelectVendedoras(); }
+    else alert('Funcionário excluído, mas não consegui remover ela da lista de Vendedoras: '+errV.message);
+  }
   funcionarios=funcionarios.filter(f=>f.id!==id); renderFuncionarios();
 }
 async function uploadArquivoFuncionario(event, campo){
