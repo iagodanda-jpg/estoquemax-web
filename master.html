@@ -2450,10 +2450,8 @@ async function salvarVenda(){
     if(error){ btn.disabled=false; alert('Erro: '+error.message); return; }
     vendaId=data.id; vendas.unshift(vendaFromRow(data));
   }
-  if(status==='confirmado'||status==='entregue'){
-    if(!vendaAnterior||(vendaAnterior.status==='pendente'||vendaAnterior.status==='cancelado')){
-      await ajustarEstoqueVenda(itensFiltrados,-1);
-    }
+  if(isNova && status!=='cancelado'){
+    await ajustarEstoqueVenda(itensFiltrados,-1);
   }
   if(previsaoISO && isNova){
     const jaExiste = entregas.some(e=>e.vendaId==vendaId);
@@ -2487,11 +2485,11 @@ async function mudarPgtoRecebido(id,valor){
 async function mudarStatusVenda(id,status){
   const v=vendas.find(x=>x.id===id); if(!v) return;
   const anterior=v.status;
-  if((status==='confirmado'||status==='entregue')&&(anterior==='pendente'||anterior==='cancelado')){
-    await ajustarEstoqueVenda(v.itens,-1);
-  }
-  if(status==='cancelado'&&(anterior==='confirmado'||anterior==='entregue')){
+  if(anterior!=='cancelado'&&status==='cancelado'){
     await ajustarEstoqueVenda(v.itens,1);
+  }
+  if(anterior==='cancelado'&&status!=='cancelado'){
+    await ajustarEstoqueVenda(v.itens,-1);
   }
   const {error}=await sb.from('vendas').update({status}).eq('id',id);
   if(error){ alert('Erro: '+error.message); return; }
@@ -2500,14 +2498,16 @@ async function mudarStatusVenda(id,status){
 }
 async function excluirVenda(id){
   if(!confirm('Excluir esta venda? A entrega vinculada a ela também será excluída.')) return;
+  const v=vendas.find(x=>x.id===id);
   const {error:errEntrega} = await sb.from('entregas').delete().eq('venda_id',id);
   if(errEntrega){ alert('Erro ao excluir entrega vinculada: '+errEntrega.message); return; }
   const {data:apagados, error}=await sb.from('vendas').delete().eq('id',id).select('id');
   if(error){ alert('Erro: '+error.message); return; }
   if(!apagados || !apagados.length){ alert('A venda não foi excluída: falta permissão no banco (RLS) para o administrador excluir vendas. Peça pra rodar a policy de DELETE na tabela "vendas".'); return; }
+  if(v && v.status!=='cancelado'){ await ajustarEstoqueVenda(v.itens,1); }
   vendas=vendas.filter(v=>v.id!==id);
   entregas=entregas.filter(e=>e.vendaId!=id);
-  renderVendas(); renderEntregas();
+  renderVendas(); renderEntregas(); renderProd(); renderDash();
 }
 function agendarEntregaDaVenda(vid){
   const v=vendas.find(x=>x.id===vid); if(!v) return;
