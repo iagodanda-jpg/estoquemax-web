@@ -305,6 +305,10 @@
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
       Matérias-Primas
     </button>
+    <button onclick="irAba('fornecedores')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+      Fornecedores
+    </button>
     <div class="sidebar-sep"></div>
     <button id="btn-alerta-aba" onclick="irAba('alertas')">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -448,8 +452,25 @@
     </div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>Matéria-Prima</th><th>Categoria</th><th>Qtd</th><th>Unid.</th><th>Mín.</th><th>Custo/unid.</th><th>Valor Total</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Matéria-Prima</th><th>Categoria</th><th>Fornecedor</th><th>Qtd</th><th>Unid.</th><th>Mín.</th><th>Custo/unid.</th><th>Valor Total</th><th>Status</th><th></th></tr></thead>
         <tbody id="tbody-mp"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- FORNECEDORES -->
+  <div id="aba-fornecedores" class="aba">
+    <div class="toolbar">
+      <input id="busca-fornecedor" oninput="renderFornecedores()" placeholder="Buscar fornecedor...">
+      <button class="btn btn-success" onclick="abrirModalFornecedor()" style="display:flex;align-items:center;gap:6px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Novo Fornecedor
+      </button>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Nome</th><th>Contato</th><th>Telefone</th><th>Forma de Pagamento</th><th>Obs.</th><th></th></tr></thead>
+        <tbody id="tbody-fornecedores"></tbody>
       </table>
     </div>
   </div>
@@ -731,9 +752,48 @@
         <div class="field"><label>Estoque Mínimo</label><input id="mp-min" type="number" min="0"></div>
         <div class="field"><label>Custo/Unid (R$)</label><input id="mp-custo" type="number" min="0" step="0.01"></div>
       </div>
+      <div class="field"><label>Fornecedor (opcional)</label><select id="mp-fornecedor"><option value="">— Nenhum —</option></select></div>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
         <button class="btn btn-ghost" onclick="fecharModal('mp')">Cancelar</button>
         <button class="btn btn-success" id="btn-salvar-mp" onclick="salvarMP()">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL FORNECEDOR -->
+<div class="overlay" id="modal-fornecedor">
+  <div class="modal">
+    <div class="modal-header"><h2 id="modal-fornecedor-titulo">Novo Fornecedor</h2><button onclick="fecharModal('fornecedor')">&times;</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Nome</label><input id="forn-nome" placeholder="Nome do fornecedor"></div>
+      <div class="grid2">
+        <div class="field"><label>Contato</label><input id="forn-contato" placeholder="Nome do responsável"></div>
+        <div class="field"><label>Telefone</label><input id="forn-tel" placeholder="(00) 00000-0000"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Forma de Pagamento</label>
+          <select id="forn-pgto" onchange="toggleFornPrazoBoleto()">
+            <option value="Pix">Pix</option>
+            <option value="Boleto">Boleto</option>
+            <option value="Promissória">Promissória</option>
+            <option value="Cartão">Cartão</option>
+            <option value="À vista">À vista</option>
+          </select>
+        </div>
+        <div class="field" id="wrap-forn-prazo" style="display:none"><label>Prazo do Boleto</label>
+          <select id="forn-prazo">
+            <option value="30">30 dias</option>
+            <option value="60">60 dias</option>
+            <option value="90">90 dias</option>
+            <option value="120">120 dias</option>
+          </select>
+        </div>
+      </div>
+      <div class="field"><label>Observações</label><input id="forn-obs" placeholder="Detalhes adicionais..."></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+        <button class="btn btn-ghost" onclick="fecharModal('fornecedor')">Cancelar</button>
+        <button class="btn btn-success" id="btn-salvar-fornecedor" onclick="salvarFornecedor()">Salvar</button>
       </div>
     </div>
   </div>
@@ -1137,6 +1197,7 @@ let vendedoras = [];
 let entregadores = [];
 let posVendas = [];
 let orcamentos = [];
+let fornecedores = [];
 let editandoPosVenda = null;
 let empresa = { nome: '', cnpj: '', tel: '', email: '', end: '', slogan: '', logoUrl: '' };
 let empresaLogoBase64 = null;
@@ -1168,7 +1229,7 @@ function fmtDataBR(iso){ return iso ? new Date(iso+'T12:00:00').toLocaleDateStri
 
 // ─── ADAPTADORES SUPABASE ↔ MODELO LOCAL ─────────────────────────────────────
 function normalizeProd(r){ return {...r, qtd:Number(r.qtd), minimo:Number(r.minimo), preco:Number(r.preco), custo:Number(r.custo)}; }
-function normalizeMP(r){ return {...r, qtd:Number(r.qtd), minimo:Number(r.minimo), custo:Number(r.custo)}; }
+function normalizeMP(r){ return {...r, qtd:Number(r.qtd), minimo:Number(r.minimo), custo:Number(r.custo), fornecedorId:r.fornecedor_id||null}; }
 
 function vendaFromRow(r){
   return {
@@ -1244,6 +1305,10 @@ async function carregarTudo(){
     const oc = await sb.from('orcamentos').select('*').order('criado_em',{ascending:false});
     orcamentos = oc.data||[];
   } catch(e){ orcamentos = []; }
+  try{
+    const fo = await sb.from('fornecedores').select('*').order('nome');
+    fornecedores = fo.data||[];
+  } catch(e){ fornecedores = []; }
   empresaLogoBase64 = empresa.logoUrl ? await carregarLogoBase64(empresa.logoUrl) : null;
 }
 
@@ -1287,7 +1352,7 @@ function popularCidades(idEstado, idCidade){
 }
 
 // ─── SIDEBAR / NAVEGAÇÃO ──────────────────────────────────────────────────────
-const NOMES_ABAS = { dashboard:'Dashboard', vendas:'Vendas', orcamentos:'Orçamentos', entregas:'Entregas', posvenda:'Pós-venda', produtos:'Produtos', materias:'Matérias-Primas', alertas:'Alertas', exportar:'Exportar PDF', backup:'Backup' };
+const NOMES_ABAS = { dashboard:'Dashboard', vendas:'Vendas', orcamentos:'Orçamentos', entregas:'Entregas', posvenda:'Pós-venda', produtos:'Produtos', materias:'Matérias-Primas', fornecedores:'Fornecedores', alertas:'Alertas', exportar:'Exportar PDF', backup:'Backup' };
 function abrirSidebar(){ document.getElementById('sidebar').classList.add('open'); document.getElementById('sidebar-overlay').classList.add('show'); }
 function fecharSidebar(){ document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebar-overlay').classList.remove('show'); }
 function irAba(id){
@@ -1302,6 +1367,7 @@ function irAba(id){
   if(id==='entregas'){ renderEntregas(); renderCalendario(); }
   if(id==='produtos') renderProd();
   if(id==='materias') renderMP();
+  if(id==='fornecedores') renderFornecedores();
   if(id==='alertas') renderAlertas();
   if(id==='posvenda') renderPosVendas();
   fecharSidebar();
@@ -1402,12 +1468,14 @@ function renderMP(){
   const busca = (document.getElementById('busca-mp')?.value||'').toLowerCase();
   const lista = materias.filter(m=>m.nome.toLowerCase().includes(busca)||(m.categoria||'').toLowerCase().includes(busca));
   const tbody = document.getElementById('tbody-mp');
-  if(!lista.length){ tbody.innerHTML=`<tr><td colspan="9" class="sem-dados">Nenhuma matéria-prima encontrada.</td></tr>`; return; }
+  if(!lista.length){ tbody.innerHTML=`<tr><td colspan="10" class="sem-dados">Nenhuma matéria-prima encontrada.</td></tr>`; return; }
   tbody.innerHTML = lista.map(m=>{
     const baixo = m.qtd<m.minimo;
+    const forn = m.fornecedorId?fornecedores.find(f=>f.id==m.fornecedorId):null;
     return `<tr>
       <td><b>${m.nome}</b></td>
       <td style="color:var(--sub)">${m.categoria||''}</td>
+      <td style="font-size:12px">${forn?forn.nome:'<span style="color:var(--sub)">—</span>'}</td>
       <td style="font-weight:700;color:${baixo?'var(--vm)':'var(--txt)'}">${m.qtd}</td>
       <td style="color:var(--sub)">${m.unidade}</td>
       <td style="color:var(--sub)">${m.minimo}</td>
@@ -1449,14 +1517,19 @@ function renderAlertas(){
       </div></div>`).join('')}`:'';
   document.getElementById('alertas-mp-wrap').innerHTML = aM.length?`
     <div style="font-weight:700;font-size:15px;margin:18px 0 12px;color:var(--am)">Matérias-Primas Abaixo do Mínimo (${aM.length})</div>
-    ${aM.map(m=>`<div class="alerta-card" style="border-left:5px solid var(--am2)">
+    ${aM.map(m=>{
+      const forn=m.fornecedorId?fornecedores.find(f=>f.id==m.fornecedorId):null;
+      const pgtoTxt=forn?(forn.forma_pagamento==='Boleto'&&forn.prazo_boleto?`Boleto ${forn.prazo_boleto}d`:forn.forma_pagamento):null;
+      return `<div class="alerta-card" style="border-left:5px solid var(--am2)">
       <div><div style="font-weight:700;font-size:15px">${m.nome}</div>
       <div style="color:var(--sub);font-size:13px;margin-top:4px">${badge(m.categoria||'','badge-cinza')}
-      <span style="margin-left:8px">Estoque: <b style="color:var(--vm)">${m.qtd} ${m.unidade}</b> — Mínimo: ${m.minimo} ${m.unidade}</span></div></div>
+      <span style="margin-left:8px">Estoque: <b style="color:var(--vm)">${m.qtd} ${m.unidade}</b> — Mínimo: ${m.minimo} ${m.unidade}</span></div>
+      <div style="font-size:12.5px;color:var(--sub);margin-top:4px">${forn?`Fornecedor: <b>${forn.nome}</b>${pgtoTxt?' · '+badge(pgtoTxt,'badge-azul'):''}${forn.telefone?' · '+forn.telefone:''}`:'<span style="color:var(--borda)">Sem fornecedor cadastrado</span>'}</div></div>
       <div style="display:flex;gap:8px;align-items:center">
         <div class="alerta-falta" style="background:#FEF9C3"><div style="font-size:11px;color:var(--am);font-weight:600">FALTAM</div><div style="font-size:20px;font-weight:800;color:var(--am)">${m.minimo-m.qtd}</div><div style="font-size:11px;color:var(--am)">${m.unidade}</div></div>
         <button class="btn btn-warn" onclick="abrirModalMovPrefill('mp',${m.id},'entrada')">+ Dar Entrada</button>
-      </div></div>`).join('')}`:'';
+      </div></div>`;
+    }).join('')}`:'';
   const tot = aP.length+aM.length;
   const alertSidebar = document.getElementById('alerta-sidebar');
   if(alertSidebar) alertSidebar.className = tot>0 ? 'show' : '';
@@ -1465,7 +1538,7 @@ function renderAlertas(){
 }
 
 // ─── MATÉRIA-PRIMA CRUD ───────────────────────────────────────────────────────
-function abrirModalMP(){ editandoMP=null; document.getElementById('modal-mp-titulo').textContent='Nova Matéria-Prima'; ['mp-nome','mp-cat','mp-qtd','mp-min','mp-custo'].forEach(id=>document.getElementById(id).value=''); document.getElementById('mp-unid').value='m'; document.getElementById('modal-mp').classList.add('open'); }
+function abrirModalMP(){ editandoMP=null; document.getElementById('modal-mp-titulo').textContent='Nova Matéria-Prima'; ['mp-nome','mp-cat','mp-qtd','mp-min','mp-custo'].forEach(id=>document.getElementById(id).value=''); document.getElementById('mp-unid').value='m'; popularSelectFornecedores(); document.getElementById('mp-fornecedor').value=''; document.getElementById('modal-mp').classList.add('open'); }
 function editarMP(id){
   const m = materias.find(x=>x.id===id); if(!m) return;
   editandoMP=id;
@@ -1476,13 +1549,15 @@ function editarMP(id){
   document.getElementById('mp-qtd').value=m.qtd;
   document.getElementById('mp-min').value=m.minimo;
   document.getElementById('mp-custo').value=m.custo;
+  popularSelectFornecedores();
+  document.getElementById('mp-fornecedor').value=m.fornecedorId||'';
   document.getElementById('modal-mp').classList.add('open');
 }
 async function salvarMP(){
   const nome=document.getElementById('mp-nome').value.trim();
   const qtd=Number(document.getElementById('mp-qtd').value);
   if(!nome||isNaN(qtd)){ alert('Preencha nome e quantidade.'); return; }
-  const obj={nome,categoria:document.getElementById('mp-cat').value,unidade:document.getElementById('mp-unid').value,qtd,minimo:Number(document.getElementById('mp-min').value),custo:Number(document.getElementById('mp-custo').value)};
+  const obj={nome,categoria:document.getElementById('mp-cat').value,unidade:document.getElementById('mp-unid').value,qtd,minimo:Number(document.getElementById('mp-min').value),custo:Number(document.getElementById('mp-custo').value),fornecedor_id:document.getElementById('mp-fornecedor').value||null};
   const btn=document.getElementById('btn-salvar-mp'); btn.disabled=true;
   if(editandoMP){
     const {data,error}=await sb.from('materias_primas').update(obj).eq('id',editandoMP).select().single();
@@ -1503,6 +1578,86 @@ async function excluirMP(id){
   if(error){ alert('Erro: '+error.message); return; }
   if(!apagados || !apagados.length){ alert('Item não excluído: falta permissão no banco (RLS).'); return; }
   materias=materias.filter(m=>m.id!==id); renderMP(); renderDash();
+}
+
+// ─── FORNECEDOR CRUD ──────────────────────────────────────────────────────────
+function popularSelectFornecedores(){
+  const sel=document.getElementById('mp-fornecedor');
+  if(sel) sel.innerHTML='<option value="">— Nenhum —</option>'+fornecedores.map(f=>`<option value="${f.id}">${f.nome}</option>`).join('');
+}
+function renderFornecedores(){
+  const busca=(document.getElementById('busca-fornecedor')?.value||'').toLowerCase();
+  const lista=fornecedores.filter(f=>f.nome.toLowerCase().includes(busca));
+  const tbody=document.getElementById('tbody-fornecedores');
+  if(!lista.length){ tbody.innerHTML=`<tr><td colspan="6" class="sem-dados">Nenhum fornecedor cadastrado.</td></tr>`; return; }
+  tbody.innerHTML=lista.map(f=>{
+    const pgtoTxt=f.forma_pagamento==='Boleto'&&f.prazo_boleto?`Boleto ${f.prazo_boleto} dias`:f.forma_pagamento;
+    return `<tr>
+    <td><b>${f.nome}</b></td>
+    <td style="color:var(--sub)">${f.contato||'—'}</td>
+    <td style="color:var(--sub)">${f.telefone||'—'}</td>
+    <td>${badge(pgtoTxt||'—','badge-azul')}</td>
+    <td style="font-size:12px;color:var(--sub)">${f.obs||'—'}</td>
+    <td><button class="btn btn-sm btn-ghost" onclick="editarFornecedor(${f.id})">Editar</button> <button class="btn btn-sm" style="background:none;border:1.5px solid var(--borda)" onclick="excluirFornecedor(${f.id})">Excluir</button></td>
+    </tr>`;
+  }).join('');
+}
+function toggleFornPrazoBoleto(){
+  const isBoleto=document.getElementById('forn-pgto').value==='Boleto';
+  document.getElementById('wrap-forn-prazo').style.display=isBoleto?'block':'none';
+}
+let editandoFornecedor=null;
+function abrirModalFornecedor(){
+  editandoFornecedor=null;
+  document.getElementById('modal-fornecedor-titulo').textContent='Novo Fornecedor';
+  ['forn-nome','forn-contato','forn-tel','forn-obs'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('forn-pgto').value='Pix';
+  document.getElementById('forn-prazo').value='30';
+  toggleFornPrazoBoleto();
+  document.getElementById('modal-fornecedor').classList.add('open');
+}
+function editarFornecedor(id){
+  const f=fornecedores.find(x=>x.id===id); if(!f) return;
+  editandoFornecedor=id;
+  document.getElementById('modal-fornecedor-titulo').textContent='Editar Fornecedor';
+  document.getElementById('forn-nome').value=f.nome;
+  document.getElementById('forn-contato').value=f.contato||'';
+  document.getElementById('forn-tel').value=f.telefone||'';
+  document.getElementById('forn-pgto').value=f.forma_pagamento||'Pix';
+  document.getElementById('forn-prazo').value=f.prazo_boleto||'30';
+  toggleFornPrazoBoleto();
+  document.getElementById('forn-obs').value=f.obs||'';
+  document.getElementById('modal-fornecedor').classList.add('open');
+}
+async function salvarFornecedor(){
+  const nome=document.getElementById('forn-nome').value.trim();
+  if(!nome){ alert('Informe o nome do fornecedor.'); return; }
+  const formaPgto=document.getElementById('forn-pgto').value;
+  const obj={
+    nome, contato:document.getElementById('forn-contato').value, telefone:document.getElementById('forn-tel').value,
+    forma_pagamento:formaPgto, prazo_boleto:formaPgto==='Boleto'?document.getElementById('forn-prazo').value:null,
+    obs:document.getElementById('forn-obs').value
+  };
+  const btn=document.getElementById('btn-salvar-fornecedor'); btn.disabled=true;
+  if(editandoFornecedor){
+    const {data,error}=await sb.from('fornecedores').update(obj).eq('id',editandoFornecedor).select().single();
+    btn.disabled=false;
+    if(error){ alert('Erro: '+error.message); return; }
+    fornecedores=fornecedores.map(f=>f.id===editandoFornecedor?data:f);
+  } else {
+    const {data,error}=await sb.from('fornecedores').insert(obj).select().single();
+    btn.disabled=false;
+    if(error){ alert('Erro: '+error.message); return; }
+    fornecedores.push(data);
+  }
+  fecharModal('fornecedor'); renderFornecedores(); renderMP(); renderAlertas();
+}
+async function excluirFornecedor(id){
+  if(!confirm('Excluir este fornecedor?')) return;
+  const {data:apagados, error}=await sb.from('fornecedores').delete().eq('id',id).select('id');
+  if(error){ alert('Erro: '+error.message); return; }
+  if(!apagados || !apagados.length){ alert('Fornecedor não excluído: falta permissão no banco (RLS).'); return; }
+  fornecedores=fornecedores.filter(f=>f.id!==id); renderFornecedores(); renderMP(); renderAlertas();
 }
 
 // ─── PRODUTO CRUD ─────────────────────────────────────────────────────────────
