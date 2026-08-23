@@ -78,6 +78,7 @@
       <button onclick="ir('nv')" id="nnv">Nova Venda</button>
       <button onclick="ir('mv')" id="nmv">Minhas Vendas</button>
       <button onclick="ir('oc')" id="noc">Orçamento</button>
+      <button onclick="ir('pv')" id="npv">Pós-venda</button>
       <button onclick="ir('cal')" id="ncal">Calendário de Entregas</button>
     </nav>
     <div class="drawer-footer"><button onclick="logout()">Sair</button></div>
@@ -275,6 +276,41 @@
       </div>
     </div>
 
+    <!-- PÓS-VENDA -->
+    <div id="ab-pv" class="ab">
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button id="pv-tab-form" onclick="pvView('form')" style="flex:1;border:none;border-radius:10px;padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;background:var(--azul);color:#fff">Novo Registro</button>
+        <button id="pv-tab-hist" onclick="pvView('hist')" style="flex:1;border:1.5px solid var(--azul);border-radius:10px;padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;background:transparent;color:var(--azul)">Minhas Pós-vendas</button>
+      </div>
+      <div id="pv-hist" style="display:none"><div id="pv-hist-list"></div></div>
+      <div id="pv-form" class="ca">
+        <b style="display:block;margin-bottom:12px">Registrar Pós-venda</b>
+        <div class="fi"><label>Venda de Origem (opcional)</label>
+          <div style="position:relative">
+            <input type="text" id="pvv-venda-busca" placeholder="Buscar por cliente ou número da venda..." oninput="buscarVendaPV(this.value)" onfocus="this.select();buscarVendaPV('')" onblur="fecharSugPV('venda')" autocomplete="off">
+            <input type="hidden" id="pvv-venda">
+            <div id="sug-pv-venda" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--borda);border-radius:8px;margin-top:2px;max-height:200px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div>
+          </div>
+        </div>
+        <div class="fi"><label>Cliente</label><input id="pvv-cliente" placeholder="Nome do cliente"></div>
+        <div class="fi"><label>Produto</label>
+          <div style="position:relative">
+            <input type="text" id="pvv-produto-busca" placeholder="Buscar produto..." oninput="buscarProdutoPV(this.value)" onfocus="this.select();buscarProdutoPV('')" onblur="fecharSugPV('produto')" autocomplete="off">
+            <input type="hidden" id="pvv-produto">
+            <div id="sug-pv-produto" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--borda);border-radius:8px;margin-top:2px;max-height:200px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div>
+          </div>
+        </div>
+        <div class="fi"><label>Nome do Produto (se não estiver na lista)</label><input id="pvv-produto-nome" placeholder="Nome do produto"></div>
+        <div class="fi"><label>Tipo de Conserto / Serviço</label><input id="pvv-tipo" placeholder="Ex: Troca de espuma, ajuste de pé..."></div>
+        <div class="row2">
+          <div class="fi"><label>Prazo</label><input id="pvv-prazo" type="date"></div>
+          <div class="fi"><label>Custo (R$)</label><input id="pvv-custo" type="number" min="0" step="0.01"></div>
+        </div>
+        <div class="fi"><label>Observações</label><input id="pvv-obs" placeholder="Detalhes adicionais..."></div>
+        <button class="bt bs" onclick="salvarPosVendaVend()" id="pvv-btn" style="margin-bottom:0">Registrar Pós-venda</button>
+      </div>
+    </div>
+
     <!-- CALENDÁRIO DE ENTREGAS -->
     <div id="ab-cal" class="ab">
       <div class="ca">
@@ -421,6 +457,7 @@ function ir(id){
   if(id==='mv') cMV();
   if(id==='nv'){ rI(); document.getElementById('vpr').min=new Date().toISOString().slice(0,10); }
   if(id==='oc'){ ocView('form'); rO(); if(!document.getElementById('oval').value){ const v=new Date(); v.setDate(v.getDate()+7); document.getElementById('oval').value=v.toISOString().slice(0,10); } }
+  if(id==='pv'){ pvView('form'); if(!vendasCache.length) cMV(); }
   if(id==='cal'){ semanaOffsetVend=0; renderCalVend(); }
   fecharDrawer();
 }
@@ -1096,6 +1133,100 @@ async function gerarOrcamentoPDF(orc, its){
     } catch(e){ /* usuário cancelou o compartilhamento, cai no download */ }
   }
   doc.save(nomeArquivo);
+}
+
+// ─── PÓS-VENDA ──────────────────────────────────────────────────────────────
+const LBL_POSVENDA_V = { aberto:'Aberto', em_andamento:'Em andamento', aguardando_peca:'Aguardando peça', concluido:'Concluído' };
+const CL_POSVENDA_V = { aberto:'#FEF9C3', em_andamento:'#DBEAFE', aguardando_peca:'#FDE68A', concluido:'#DCFCE7' };
+let posVendasCache=[];
+function pvView(v){
+  document.getElementById('pv-form').style.display = v==='form'?'block':'none';
+  document.getElementById('pv-hist').style.display = v==='hist'?'block':'none';
+  const tf=document.getElementById('pv-tab-form'), th=document.getElementById('pv-tab-hist');
+  tf.style.background = v==='form'?'var(--azul)':'transparent'; tf.style.color = v==='form'?'#fff':'var(--azul)';
+  th.style.background = v==='hist'?'var(--azul)':'transparent'; th.style.color = v==='hist'?'#fff':'var(--azul)';
+  if(v==='hist') cPVH();
+}
+async function cPVH(){
+  const {data:ps,error}=await sb.from('pos_vendas').select('*').eq('perfil_id',pid).order('criado_em',{ascending:false});
+  if(error){ document.getElementById('pv-hist-list').innerHTML=`<div style="text-align:center;color:var(--vm);padding:30px;font-size:13px">Erro ao carregar: ${error.message}</div>`; return; }
+  posVendasCache=ps||[];
+  document.getElementById('pv-hist-list').innerHTML=posVendasCache.length?posVendasCache.map(p=>`<div class="vi">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+        <div><b>${p.cliente}</b><div style="font-size:11px;color:var(--sub)">${p.produto_nome||''}${p.venda_id?' · Venda #'+p.venda_id:''}</div></div>
+      </div>
+      <div style="font-size:12.5px;color:var(--sub);margin-bottom:6px">${p.tipo_conserto}${p.prazo?' · prazo '+new Date(p.prazo+'T12:00:00').toLocaleDateString('pt-BR'):''}</div>
+      <span class="badge" style="background:${CL_POSVENDA_V[p.status]||'#DBEAFE'}">${LBL_POSVENDA_V[p.status]||p.status}</span>
+    </div>`).join('') : '<div style="text-align:center;color:var(--sub);padding:30px">Nenhum registro ainda</div>';
+}
+function buscarVendaPV(termo){
+  const box=document.getElementById('sug-pv-venda'); if(!box) return;
+  const t=(termo||'').toLowerCase().trim();
+  const matches=(t?vendasCache.filter(v=>v.cliente.toLowerCase().includes(t)||String(v.id).includes(t)):vendasCache).slice(0,40);
+  let html='<div onmousedown="event.preventDefault()" onclick="selecionarVendaPV(\'\')" style="padding:9px 12px;cursor:pointer;font-size:13px;color:var(--sub);border-bottom:1px solid var(--fundo)">— Avulso (sem venda vinculada) —</div>';
+  html += matches.length ? matches.map(v=>`<div onmousedown="event.preventDefault()" onclick="selecionarVendaPV(${v.id})" style="padding:9px 12px;cursor:pointer;font-size:13.5px;border-bottom:1px solid var(--fundo)">#${v.id} – ${v.cliente}</div>`).join('') : '<div style="padding:10px 12px;font-size:13px;color:var(--sub)">Nenhuma venda encontrada</div>';
+  box.innerHTML=html;
+  box.style.display='block';
+}
+function selecionarVendaPV(id){
+  document.getElementById('pvv-venda').value=id;
+  if(id===''){ document.getElementById('pvv-venda-busca').value=''; document.getElementById('sug-pv-venda').style.display='none'; return; }
+  const v=vendasCache.find(x=>x.id==id);
+  document.getElementById('pvv-venda-busca').value=v?`#${v.id} – ${v.cliente}`:'';
+  document.getElementById('sug-pv-venda').style.display='none';
+  if(v){
+    document.getElementById('pvv-cliente').value=v.cliente;
+    const itensV=v.itens||[];
+    if(itensV.length===1){
+      const prod=prods.find(x=>x.id==itensV[0].id);
+      if(prod) selecionarProdutoPV(prod.id);
+      else document.getElementById('pvv-produto-nome').value=itensV[0].nome||'';
+    }
+  }
+}
+function buscarProdutoPV(termo){
+  const box=document.getElementById('sug-pv-produto'); if(!box) return;
+  const t=(termo||'').toLowerCase().trim();
+  const matches=(t?prods.filter(p=>p.nome.toLowerCase().includes(t)):prods).slice(0,40);
+  let html='<div onmousedown="event.preventDefault()" onclick="selecionarProdutoPV(\'\')" style="padding:9px 12px;cursor:pointer;font-size:13px;color:var(--sub);border-bottom:1px solid var(--fundo)">— Nenhum / não listado —</div>';
+  html += matches.length ? matches.map(p=>`<div onmousedown="event.preventDefault()" onclick="selecionarProdutoPV(${p.id})" style="padding:9px 12px;cursor:pointer;font-size:13.5px;border-bottom:1px solid var(--fundo)">${p.nome}</div>`).join('') : '<div style="padding:10px 12px;font-size:13px;color:var(--sub)">Nenhum produto encontrado</div>';
+  box.innerHTML=html;
+  box.style.display='block';
+}
+function selecionarProdutoPV(id){
+  document.getElementById('pvv-produto').value=id;
+  if(id===''){ document.getElementById('pvv-produto-busca').value=''; document.getElementById('sug-pv-produto').style.display='none'; return; }
+  const p=prods.find(x=>x.id==id);
+  document.getElementById('pvv-produto-busca').value=p?p.nome:'';
+  if(p) document.getElementById('pvv-produto-nome').value=p.nome;
+  document.getElementById('sug-pv-produto').style.display='none';
+}
+function fecharSugPV(tipo){
+  setTimeout(()=>{ const box=document.getElementById('sug-pv-'+tipo); if(box) box.style.display='none'; }, 150);
+}
+async function salvarPosVendaVend(){
+  const cliente=document.getElementById('pvv-cliente').value.trim();
+  const tipoConserto=document.getElementById('pvv-tipo').value.trim();
+  if(!cliente||!tipoConserto) return alert('Informe o cliente e o tipo de conserto.');
+  const btn=document.getElementById('pvv-btn'); btn.textContent='...'; btn.disabled=true;
+  const obj={
+    venda_id: document.getElementById('pvv-venda').value||null, cliente,
+    produto_id: document.getElementById('pvv-produto').value||null,
+    produto_nome: document.getElementById('pvv-produto-nome').value.trim(),
+    tipo_conserto: tipoConserto, prazo: document.getElementById('pvv-prazo').value||null,
+    custo: Number(document.getElementById('pvv-custo').value)||0,
+    vendedora_id: vid||null, vendedora_nome: vnome||null,
+    status: 'aberto', obs: document.getElementById('pvv-obs').value,
+    perfil_id: pid
+  };
+  const {error}=await sb.from('pos_vendas').insert(obj);
+  btn.textContent='Registrar Pós-venda'; btn.disabled=false;
+  if(error){ alert('Erro: '+error.message); return; }
+  ['pvv-cliente','pvv-produto-nome','pvv-tipo','pvv-prazo','pvv-custo','pvv-obs','pvv-venda-busca','pvv-produto-busca'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pvv-venda').value='';
+  document.getElementById('pvv-produto').value='';
+  alert('Pós-venda registrado!');
+  pvView('hist');
 }
 
 // ─── INIT ────────────────────────────────────────────────────────────────────
