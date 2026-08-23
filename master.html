@@ -835,7 +835,7 @@
       <div class="field"><label>Nome</label><input id="func-nome" placeholder="Nome completo"></div>
       <div class="grid2">
         <div class="field"><label>Tipo</label>
-          <select id="func-tipo">
+          <select id="func-tipo" onchange="toggleFuncVendedoraExistente()">
             <option value="Vendedora">Vendedora</option>
             <option value="Produção">Produção</option>
             <option value="Entregador">Entregador</option>
@@ -848,6 +848,10 @@
             <option value="terceirizado">Terceirizado</option>
           </select>
         </div>
+      </div>
+      <div class="field" id="wrap-func-vendedora-existente">
+        <label>Vincular a uma vendedora já existente (opcional)</label>
+        <select id="func-vendedora-existente"><option value="">— Vai criar uma vendedora nova —</option></select>
       </div>
       <div class="grid2">
         <div class="field"><label>Telefone</label><input id="func-tel" placeholder="(00) 00000-0000"></div>
@@ -1769,6 +1773,13 @@ function renderFuncionarios(){
     </tr>`).join('');
 }
 let editandoFuncionario=null;
+function toggleFuncVendedoraExistente(){
+  document.getElementById('wrap-func-vendedora-existente').style.display = document.getElementById('func-tipo').value==='Vendedora'?'block':'none';
+}
+function popularSelectVendedoraExistente(selecionadoId){
+  const sel=document.getElementById('func-vendedora-existente'); if(!sel) return;
+  sel.innerHTML='<option value="">— Vai criar uma vendedora nova —</option>'+vendedoras.map(v=>`<option value="${v.id}"${selecionadoId==v.id?' selected':''}>${v.nome}</option>`).join('');
+}
 function abrirModalFuncionario(){
   editandoFuncionario=null;
   document.getElementById('modal-funcionario-titulo').textContent='Novo Funcionário';
@@ -1779,6 +1790,8 @@ function abrirModalFuncionario(){
   document.getElementById('func-contrato-url').value='';
   document.getElementById('func-documento-status').innerHTML='';
   document.getElementById('func-contrato-status').innerHTML='';
+  popularSelectVendedoraExistente(null);
+  toggleFuncVendedoraExistente();
   document.getElementById('modal-funcionario').classList.add('open');
 }
 function editarFuncionario(id){
@@ -1799,6 +1812,8 @@ function editarFuncionario(id){
   document.getElementById('func-contrato-url').value=f.contrato_url||'';
   document.getElementById('func-documento-status').innerHTML=f.documento_url?`<a href="${f.documento_url}" target="_blank">Ver arquivo atual</a>`:'';
   document.getElementById('func-contrato-status').innerHTML=f.contrato_url?`<a href="${f.contrato_url}" target="_blank">Ver arquivo atual</a>`:'';
+  popularSelectVendedoraExistente(f.vendedora_id);
+  toggleFuncVendedoraExistente();
   document.getElementById('modal-funcionario').classList.add('open');
 }
 async function salvarFuncionario(){
@@ -1827,16 +1842,22 @@ async function salvarFuncionario(){
     funcSalvo=data;
     funcionarios.push(data);
   }
-  await sincronizarVendedoraDoFuncionario(funcSalvo);
+  const vendedoraEscolhida=document.getElementById('func-vendedora-existente').value||null;
+  await sincronizarVendedoraDoFuncionario(funcSalvo, vendedoraEscolhida?Number(vendedoraEscolhida):null);
   fecharModal('funcionario'); renderFuncionarios(); popularSelectVendedoras();
 }
-async function sincronizarVendedoraDoFuncionario(func){
+async function sincronizarVendedoraDoFuncionario(func, vendedoraEscolhidaId){
   if(func.tipo!=='Vendedora') return;
   const payload={ nome:func.nome, tel:func.telefone||'', email:func.email||'', comissao:func.comissao||0 };
-  if(func.vendedora_id){
-    const {error}=await sb.from('vendedoras').update(payload).eq('id',func.vendedora_id);
+  const alvoId=vendedoraEscolhidaId||func.vendedora_id;
+  if(alvoId){
+    const {error}=await sb.from('vendedoras').update(payload).eq('id',alvoId);
     if(error){ alert('Funcionário salvo, mas não consegui atualizar os dados dela na lista de Vendedoras: '+error.message); return; }
-    vendedoras=vendedoras.map(v=>v.id===func.vendedora_id?{...v,...payload}:v);
+    vendedoras=vendedoras.map(v=>v.id==alvoId?{...v,...payload}:v);
+    if(func.vendedora_id!==alvoId){
+      const {error:errLink}=await sb.from('funcionarios').update({vendedora_id:alvoId}).eq('id',func.id);
+      if(!errLink){ func.vendedora_id=alvoId; funcionarios=funcionarios.map(f=>f.id===func.id?{...f,vendedora_id:alvoId}:f); }
+    }
     return;
   }
   const existente=vendedoras.find(v=>v.nome.trim().toLowerCase()===func.nome.trim().toLowerCase());
