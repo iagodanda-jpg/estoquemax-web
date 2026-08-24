@@ -612,6 +612,10 @@
         <option value="aguardando_peca">Aguardando peça</option>
         <option value="concluido">Concluído</option>
       </select>
+      <button class="btn btn-ghost" onclick="sincronizarPrazosPosVendaAntigos()" style="display:flex;align-items:center;gap:6px;white-space:nowrap">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        Sincronizar Prazos Antigos
+      </button>
       <button class="btn btn-success" onclick="abrirModalPosVenda()" style="display:flex;align-items:center;gap:6px">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         Novo Registro
@@ -2367,6 +2371,19 @@ async function sincronizarEntregaPosVenda(pv){
   };
   const {data,error}=await sb.from('entregas').insert(entregaToRow(entObj)).select().single();
   if(!error) entregas.push(entregaFromRow(data));
+}
+async function sincronizarPrazosPosVendaAntigos(){
+  const pendentes=posVendas.filter(p=>p.prazo && !entregas.some(e=>e.posVendaId===p.id));
+  if(!pendentes.length){ alert('Todos os pós-vendas com prazo já estão no calendário de entregas.'); return; }
+  if(!confirm(`Encontrei ${pendentes.length} pós-venda(s) com prazo que ainda não estão no calendário. Adicionar agora?`)) return;
+  let ok=0;
+  for(const p of pendentes){
+    const antes=entregas.length;
+    await sincronizarEntregaPosVenda(p);
+    if(entregas.length>antes) ok++;
+  }
+  renderEntregas(); renderCalendario();
+  alert(`Pronto! ${ok} de ${pendentes.length} pós-venda(s) adicionados ao calendário.`);
 }
 async function baixarPosVendaPDFMaster(id){
   const p=posVendas.find(x=>x.id===id);
