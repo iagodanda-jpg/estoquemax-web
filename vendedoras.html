@@ -293,6 +293,7 @@
           </div>
         </div>
         <div class="fi"><label>Cliente</label><input id="pvv-cliente" placeholder="Nome do cliente"></div>
+        <div class="fi"><label>Endereço</label><input id="pvv-endereco" placeholder="Endereço completo do cliente"></div>
         <div class="fi"><label>Produto</label>
           <div style="position:relative">
             <input type="text" id="pvv-produto-busca" placeholder="Buscar produto..." oninput="buscarProdutoPV(this.value)" onfocus="this.select();buscarProdutoPV('')" onblur="fecharSugPV('produto')" autocomplete="off">
@@ -1184,6 +1185,8 @@ function selecionarVendaPV(id){
   document.getElementById('sug-pv-venda').style.display='none';
   if(v){
     document.getElementById('pvv-cliente').value=v.cliente;
+    const endTxt=[v.end_rua,v.end_num,v.end_cidade,v.end_estado].filter(Boolean).join(', ');
+    if(endTxt) document.getElementById('pvv-endereco').value=endTxt;
     const itensV=v.itens||[];
     if(itensV.length===1){
       const prod=prods.find(x=>x.id==itensV[0].id);
@@ -1219,6 +1222,7 @@ async function salvarPosVendaVend(){
   const btn=document.getElementById('pvv-btn'); btn.textContent='...'; btn.disabled=true;
   const obj={
     venda_id: document.getElementById('pvv-venda').value||null, cliente,
+    endereco: document.getElementById('pvv-endereco').value,
     produto_id: document.getElementById('pvv-produto').value||null,
     produto_nome: document.getElementById('pvv-produto-nome').value.trim(),
     tipo_conserto: tipoConserto, prazo: document.getElementById('pvv-prazo').value||null,
@@ -1232,13 +1236,13 @@ async function salvarPosVendaVend(){
   if(error){ alert('Erro: '+error.message); return; }
   if(data.prazo){
     const {data:entD,error:entErr}=await sb.from('entregas').insert({
-      cliente:data.cliente, end_completo:'', itens:'Pós-venda: '+data.tipo_conserto+(data.produto_nome?' — '+data.produto_nome:''),
+      cliente:data.cliente, end_completo:data.endereco||'', itens:'Pós-venda: '+data.tipo_conserto+(data.produto_nome?' — '+data.produto_nome:''),
       entregador_id:null, data_entrega:data.prazo, periodo:'Manhã', status:'agendado',
       obs:data.obs, venda_id:null, tipo:'posvenda', pos_venda_id:data.id
     }).select().single();
     if(!entErr) entregasVend.push({data_entrega:data.prazo});
   }
-  ['pvv-cliente','pvv-produto-nome','pvv-tipo','pvv-prazo','pvv-custo','pvv-obs','pvv-venda-busca','pvv-produto-busca'].forEach(id=>document.getElementById(id).value='');
+  ['pvv-cliente','pvv-endereco','pvv-produto-nome','pvv-tipo','pvv-prazo','pvv-custo','pvv-obs','pvv-venda-busca','pvv-produto-busca'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('pvv-venda').value='';
   document.getElementById('pvv-produto').value='';
   pvView('hist');
@@ -1271,6 +1275,7 @@ async function gerarPosVendaPDF(pv){
   doc.text('Cliente: '+pv.cliente, 14, 46);
   doc.setFont('helvetica','normal'); doc.setTextColor(90,106,138);
   let y=52;
+  if(pv.endereco){ doc.text('Endereço: '+pv.endereco, 14, y); y+=6; }
   if(pv.produto_nome){ doc.text('Produto: '+pv.produto_nome, 14, y); y+=6; }
   doc.text('Serviço: '+pv.tipo_conserto, 14, y); y+=6;
   if(pv.prazo){ doc.text('Prazo previsto: '+new Date(pv.prazo+'T12:00:00').toLocaleDateString('pt-BR'), 14, y); y+=6; }

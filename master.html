@@ -1105,6 +1105,7 @@
         <div class="field"><label>Nome do Produto</label><input id="pv-produto-nome" placeholder="Se não estiver na lista"></div>
       </div>
       <div class="field"><label>Tipo de Conserto / Serviço</label><input id="pv-tipo" placeholder="Ex: Troca de espuma, ajuste de pé, reforço de costura..."></div>
+      <div class="field"><label>Endereço</label><input id="pv-endereco" placeholder="Endereço completo do cliente"></div>
       <div class="grid2">
         <div class="field"><label>Prazo</label><input id="pv-prazo" type="date"></div>
         <div class="field"><label>Custo (R$)</label><input id="pv-custo" type="number" min="0" step="0.01"></div>
@@ -2263,6 +2264,7 @@ function preencherPosVendaDaVenda(){
   if(!vid) return;
   const v=vendas.find(x=>x.id==vid); if(!v) return;
   document.getElementById('pv-cliente').value=v.cliente;
+  if(v.end) document.getElementById('pv-endereco').value=v.end;
   if(v.vendedoraId) document.getElementById('pv-vendedora').value=v.vendedoraId;
   if((v.itens||[]).length===1){
     document.getElementById('pv-produto').value=v.itens[0].id;
@@ -2278,7 +2280,7 @@ function abrirModalPosVenda(){
   editandoPosVenda=null;
   document.getElementById('modal-posvenda-titulo').textContent='Novo Registro de Pós-venda';
   popularSelectsPosVenda();
-  ['pv-cliente','pv-produto-nome','pv-tipo','pv-prazo','pv-custo','pv-obs'].forEach(id=>document.getElementById(id).value='');
+  ['pv-cliente','pv-endereco','pv-produto-nome','pv-tipo','pv-prazo','pv-custo','pv-obs'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('pv-venda').value='';
   document.getElementById('pv-venda-busca').value='';
   document.getElementById('pv-produto').value='';
@@ -2296,6 +2298,7 @@ function editarPosVenda(id){
   const vOrig=p.venda_id?vendas.find(v=>v.id==p.venda_id):null;
   document.getElementById('pv-venda-busca').value=vOrig?`#${vOrig.id} – ${vOrig.cliente} (${vOrig.data})`:'';
   document.getElementById('pv-cliente').value=p.cliente||'';
+  document.getElementById('pv-endereco').value=p.endereco||'';
   document.getElementById('pv-produto').value=p.produto_id||'';
   const prodOrig=p.produto_id?produtos.find(x=>x.id==p.produto_id):null;
   document.getElementById('pv-produto-busca').value=prodOrig?prodOrig.nome:'';
@@ -2317,7 +2320,7 @@ async function salvarPosVenda(){
   const vendedoraId=document.getElementById('pv-vendedora').value||null;
   const vendSel=vendedoraId?vendedoras.find(x=>x.id==vendedoraId):null;
   const obj={
-    venda_id: vendaId, cliente,
+    venda_id: vendaId, cliente, endereco: document.getElementById('pv-endereco').value,
     produto_id: produtoId, produto_nome: document.getElementById('pv-produto-nome').value.trim(),
     tipo_conserto: tipoConserto, prazo: document.getElementById('pv-prazo').value||null,
     custo: Number(document.getElementById('pv-custo').value)||0,
@@ -2358,7 +2361,7 @@ async function sincronizarEntregaPosVenda(pv){
     return;
   }
   const entObj={
-    cliente:pv.cliente, end:'', itens:'Pós-venda: '+pv.tipo_conserto+(pv.produto_nome?' — '+pv.produto_nome:''),
+    cliente:pv.cliente, end:pv.endereco||'', itens:'Pós-venda: '+pv.tipo_conserto+(pv.produto_nome?' — '+pv.produto_nome:''),
     entregadorId:null, dataISO:pv.prazo, periodo:'Manhã', status:'agendado', obs:pv.obs||'',
     vendaId:null, tipo:'posvenda', posVendaId:pv.id
   };
@@ -2397,6 +2400,7 @@ async function gerarPosVendaPDFMaster(pv){
   doc.text('Cliente: '+pv.cliente, 14, 46);
   doc.setFont('helvetica','normal'); doc.setTextColor(90,106,138);
   let y=52;
+  if(pv.endereco){ doc.text('Endereço: '+pv.endereco, 14, y); y+=6; }
   if(pv.produto_nome){ doc.text('Produto: '+pv.produto_nome, 14, y); y+=6; }
   doc.text('Serviço: '+pv.tipo_conserto, 14, y); y+=6;
   if(pv.prazo){ doc.text('Prazo previsto: '+fmtDataBR(pv.prazo), 14, y); y+=6; }
