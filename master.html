@@ -2358,10 +2358,10 @@ async function sincronizarEntregaPosVenda(pv){
     return;
   }
   if(entLigada){
-    if(entLigada.dataISO!==pv.prazo){
-      const {error}=await sb.from('entregas').update({data_entrega:pv.prazo}).eq('id',entLigada.id);
-      if(!error) entregas=entregas.map(e=>e.id===entLigada.id?{...e,dataISO:pv.prazo,data:fmtDataBR(pv.prazo)}:e);
-    }
+    const itensTxt='Pós-venda: '+pv.tipo_conserto+(pv.produto_nome?' — '+pv.produto_nome:'');
+    const patch={ data_entrega:pv.prazo, cliente:pv.cliente, end_completo:pv.endereco||'', itens:itensTxt, obs:pv.obs||'' };
+    const {error}=await sb.from('entregas').update(patch).eq('id',entLigada.id);
+    if(!error) entregas=entregas.map(e=>e.id===entLigada.id?{...e,dataISO:pv.prazo,data:fmtDataBR(pv.prazo),cliente:pv.cliente,end:pv.endereco||'',itens:itensTxt,obs:pv.obs||''}:e);
     return;
   }
   const entObj={
