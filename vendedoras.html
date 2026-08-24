@@ -1156,8 +1156,16 @@ async function cPVH(){
         <div><b>${p.cliente}</b><div style="font-size:11px;color:var(--sub)">${p.produto_nome||''}${p.venda_id?' · Venda #'+p.venda_id:''}</div></div>
       </div>
       <div style="font-size:12.5px;color:var(--sub);margin-bottom:6px">${p.tipo_conserto}${p.prazo?' · prazo '+new Date(p.prazo+'T12:00:00').toLocaleDateString('pt-BR'):''}</div>
-      <span class="badge" style="background:${CL_POSVENDA_V[p.status]||'#DBEAFE'}">${LBL_POSVENDA_V[p.status]||p.status}</span>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span class="badge" style="background:${CL_POSVENDA_V[p.status]||'#DBEAFE'}">${LBL_POSVENDA_V[p.status]||p.status}</span>
+        <button onclick="baixarPosVendaPDF(${p.id})" style="background:#EFF6FF;border:1px solid #BFDBFE;color:#1E4D8C;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer">📄 Documento</button>
+      </div>
     </div>`).join('') : '<div style="text-align:center;color:var(--sub);padding:30px">Nenhum registro ainda</div>';
+}
+async function baixarPosVendaPDF(id){
+  const p=posVendasCache.find(x=>x.id===id);
+  if(!p) return alert('Registro não encontrado.');
+  await gerarPosVendaPDF(p);
 }
 function buscarVendaPV(termo){
   const box=document.getElementById('sug-pv-venda'); if(!box) return;
@@ -1219,14 +1227,79 @@ async function salvarPosVendaVend(){
     status: 'aberto', obs: document.getElementById('pvv-obs').value,
     perfil_id: pid
   };
-  const {error}=await sb.from('pos_vendas').insert(obj);
+  const {data,error}=await sb.from('pos_vendas').insert(obj).select().single();
   btn.textContent='Registrar Pós-venda'; btn.disabled=false;
   if(error){ alert('Erro: '+error.message); return; }
+  if(data.prazo){
+    const {data:entD,error:entErr}=await sb.from('entregas').insert({
+      cliente:data.cliente, end_completo:'', itens:'Pós-venda: '+data.tipo_conserto+(data.produto_nome?' — '+data.produto_nome:''),
+      entregador_id:null, data_entrega:data.prazo, periodo:'Manhã', status:'agendado',
+      obs:data.obs, venda_id:null, tipo:'posvenda', pos_venda_id:data.id
+    }).select().single();
+    if(!entErr) entregasVend.push({data_entrega:data.prazo});
+  }
   ['pvv-cliente','pvv-produto-nome','pvv-tipo','pvv-prazo','pvv-custo','pvv-obs','pvv-venda-busca','pvv-produto-busca'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('pvv-venda').value='';
   document.getElementById('pvv-produto').value='';
-  alert('Pós-venda registrado!');
   pvView('hist');
+  await gerarPosVendaPDF(data);
+}
+async function gerarPosVendaPDF(pv){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const W = 210;
+  doc.setFillColor(30,77,140); doc.rect(0,0,W,26,'F');
+  let textX = 14;
+  if(empLogoBase64){
+    try{
+      const fmt = empLogoBase64.includes('image/png') ? 'PNG' : empLogoBase64.includes('image/webp') ? 'WEBP' : 'JPEG';
+      doc.addImage(empLogoBase64, fmt, 14, 4, 18, 18);
+      textX = 36;
+    } catch(e){}
+  }
+  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(15);
+  doc.text(enm, textX, 12);
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  const sub2 = [emp.cnpj, emp.tel, emp.email].filter(Boolean).join('  ·  ') || 'Controle de Estofados';
+  doc.text(sub2, textX, 18);
+  doc.setFontSize(7.5); doc.text(emp.endereco || ('Emitido em '+new Date().toLocaleString('pt-BR')), textX, 23);
+
+  doc.setTextColor(30,40,64); doc.setFontSize(15); doc.setFont('helvetica','bold');
+  doc.text('Ordem de Serviço — Pós-venda #'+pv.id, 14, 36);
+
+  doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(30,40,64);
+  doc.text('Cliente: '+pv.cliente, 14, 46);
+  doc.setFont('helvetica','normal'); doc.setTextColor(90,106,138);
+  let y=52;
+  if(pv.produto_nome){ doc.text('Produto: '+pv.produto_nome, 14, y); y+=6; }
+  doc.text('Serviço: '+pv.tipo_conserto, 14, y); y+=6;
+  if(pv.prazo){ doc.text('Prazo previsto: '+new Date(pv.prazo+'T12:00:00').toLocaleDateString('pt-BR'), 14, y); y+=6; }
+  doc.text('Vendedor(a) responsável: '+(pv.vendedora_nome||vnome||'-'), 14, y); y+=6;
+  if(pv.obs){ doc.text('Observações: '+pv.obs, 14, y); y+=6; }
+  y+=10;
+
+  const ySig = Math.max(y+20, 245);
+  doc.setDrawColor(90,106,138); doc.setLineWidth(0.3);
+  doc.line(14, ySig, 95, ySig);
+  doc.line(115, ySig, W-14, ySig);
+  doc.setFontSize(9); doc.setTextColor(90,106,138); doc.setFont('helvetica','normal');
+  doc.text('Assinatura do Cliente', 14, ySig+5);
+  doc.text('Assinatura de '+enm, 115, ySig+5);
+
+  doc.setDrawColor(209,217,230); doc.setLineWidth(0.3); doc.line(14, 284, W-14, 284);
+  doc.setFontSize(7.5); doc.setTextColor(90,106,138);
+  doc.text(enm, 14, 289);
+  doc.text('Documento gerado pelo EstoqueMax', W-14, 289, {align:'right'});
+
+  const nomeArquivo = `posvenda-${pv.id}-${(pv.cliente||'').replace(/[^a-zA-Z0-9]/g,'-')}.pdf`;
+  const blob = doc.output('blob');
+  if(navigator.canShare && navigator.canShare({files:[new File([blob], nomeArquivo, {type:'application/pdf'})]})){
+    try{
+      await navigator.share({ files:[new File([blob], nomeArquivo, {type:'application/pdf'})], title:'Pós-venda #'+pv.id, text:'Segue a ordem de serviço de '+pv.cliente });
+      return;
+    } catch(e){ /* usuário cancelou o compartilhamento, cai no download */ }
+  }
+  doc.save(nomeArquivo);
 }
 
 // ─── INIT ────────────────────────────────────────────────────────────────────
