@@ -1484,10 +1484,20 @@ function renderDash(){
   const totalVendidoDash = vendasAtivasDash.reduce((a,v)=>a+v.total,0);
   const totalRecebidoDash = vendasAtivasDash.filter(v=>v.pgtoRecebido==='sim').reduce((a,v)=>a+v.total,0);
   const totalCanceladoDash = vendasCanceladasDash.reduce((a,v)=>a+v.total,0);
+  const totalPendenteDash = vendasAtivasDash.filter(v=>v.pgtoRecebido!=='sim').reduce((a,v)=>a+v.total,0);
+  const hoje3 = new Date();
+  const proxMesData = new Date(hoje3.getFullYear(), hoje3.getMonth()+1, 1);
+  const aReceberProxMes = vendasAtivasDash.filter(v=>{
+    if(v.pgtoRecebido==='sim' || !v.previsaoISO) return false;
+    const d = new Date(v.previsaoISO+'T12:00:00');
+    return d.getMonth()===proxMesData.getMonth() && d.getFullYear()===proxMesData.getFullYear();
+  }).reduce((a,v)=>a+v.total,0);
   const posVendaAbertos = posVendas.filter(p=>p.status!=='concluido').length;
   const kpis = [
     {l:'Vendas (sem cancelados)',v:vendasAtivasDash.length,s:fmtR(totalVendidoDash),cor:'#2E6BC4'},
     {l:'Recebido',v:fmtR(totalRecebidoDash),s:'pagamentos confirmados',cor:'#22A05B'},
+    {l:'A Receber',v:fmtR(totalPendenteDash),s:'pagamentos pendentes',cor:'#F59E0B'},
+    {l:'A Receber — Próximo Mês',v:fmtR(aReceberProxMes),s:'entregas previstas em '+proxMesData.toLocaleDateString('pt-BR',{month:'long',year:'numeric'}),cor:'#B45309'},
     {l:'Cancelado',v:fmtR(totalCanceladoDash),s:vendasCanceladasDash.length+' venda(s) não contadas',cor:'#B91C1C'},
     {l:'Pós-vendas em Aberto',v:posVendaAbertos,s:posVendas.length+' no total',cor:'#B45309'},
     {l:'Produtos em Estoque',v:produtos.reduce((a,p)=>a+p.qtd,0),s:produtos.length+' SKUs',cor:'#1E4D8C'},
