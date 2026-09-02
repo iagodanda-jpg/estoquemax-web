@@ -597,6 +597,9 @@
       <select id="filtro-entrega-entregador" onchange="renderEntregas()">
         <option value="todos">Todos os entregadores</option>
       </select>
+      <select id="filtro-entrega-vendedora" onchange="renderEntregas()">
+        <option value="todas">Todas as vendedoras</option>
+      </select>
       <button class="btn btn-ghost" onclick="abrirModalEntregadores()" style="white-space:nowrap;display:flex;align-items:center;gap:6px">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
         Entregadores
@@ -2162,6 +2165,8 @@ function popularSelectVendedoras(){
   if(filtro) filtro.innerHTML='<option value="todas">Todas as vendedoras</option>'+vendedoras.map(v=>`<option value="${v.id}">${v.nome}</option>`).join('');
   const filtroOrc=document.getElementById('filtro-orcamento-vendedora');
   if(filtroOrc) filtroOrc.innerHTML='<option value="todas">Todas as vendedoras</option>'+vendedoras.map(v=>`<option value="${v.id}">${v.nome}</option>`).join('');
+  const filtroEnt=document.getElementById('filtro-entrega-vendedora');
+  if(filtroEnt) filtroEnt.innerHTML='<option value="todas">Todas as vendedoras</option>'+vendedoras.map(v=>`<option value="${v.id}">${v.nome}</option>`).join('');
 }
 async function criarAcessoVendedora(id){
   const v=vendedoras.find(x=>x.id===id); if(!v) return;
@@ -3174,11 +3179,14 @@ function renderEntregas(){
   const busca=(document.getElementById('busca-entrega')?.value||'').toLowerCase();
   const filtroSt=document.getElementById('filtro-entrega-status')?.value||'todos';
   const filtroEnt=document.getElementById('filtro-entrega-entregador')?.value||'todos';
+  const filtroVend=document.getElementById('filtro-entrega-vendedora')?.value||'todas';
   const lista=entregas.filter(e=>{
     const mb=e.cliente.toLowerCase().includes(busca)||(e.end||'').toLowerCase().includes(busca);
     const ms=filtroSt==='todos'||e.status===filtroSt;
     const me=filtroEnt==='todos'||String(e.entregadorId)===filtroEnt;
-    return mb&&ms&&me;
+    const vendaLig=e.vendaId?vendas.find(v=>v.id==e.vendaId):null;
+    const mv=filtroVend==='todas'||String(vendaLig?.vendedoraId||'')===filtroVend;
+    return mb&&ms&&me&&mv;
   });
   if(sortEntregas.col){
     const dir=sortEntregas.dir, col=sortEntregas.col;
