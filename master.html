@@ -3016,7 +3016,15 @@ async function mudarStatusVenda(id,status){
   const {error}=await sb.from('vendas').update({status}).eq('id',id);
   if(error){ alert('Erro: '+error.message); return; }
   vendas=vendas.map(x=>x.id===id?{...x,status}:x);
-  renderVendas(); renderProd(); renderDash();
+  if(status==='entregue'){
+    const entLigada=entregas.find(e=>e.vendaId===id);
+    if(entLigada && entLigada.status!=='entregue'){
+      const entregueEm=entLigada.entregueEm||new Date().toISOString().slice(0,10);
+      const {error:errEnt}=await sb.from('entregas').update({status:'entregue',entregue_em:entregueEm}).eq('id',entLigada.id);
+      if(!errEnt) entregas=entregas.map(e=>e.id===entLigada.id?{...e,status:'entregue',entregueEm}:e);
+    }
+  }
+  renderVendas(); renderProd(); renderDash(); renderEntregas(); renderCalendario();
 }
 async function excluirVenda(id){
   if(!confirm('Excluir esta venda? A entrega vinculada a ela também será excluída.')) return;
@@ -3190,7 +3198,8 @@ async function salvarEntrega(){
     status, obs:document.getElementById('e-obs').value,
     vendaId:document.getElementById('e-venda').value||null,
     motivoReagendamento: status==='reagendado' ? document.getElementById('e-motivo-reagendamento').value : (entregaAnterior?.motivoReagendamento||''),
-    entregueEm: status==='entregue' ? (entregaAnterior?.entregueEm || new Date().toISOString().slice(0,10)) : (entregaAnterior?.entregueEm||'')
+    entregueEm: status==='entregue' ? (entregaAnterior?.entregueEm || new Date().toISOString().slice(0,10)) : (entregaAnterior?.entregueEm||''),
+    tipo: entregaAnterior?.tipo||'entrega', posVendaId: entregaAnterior?.posVendaId||null
   };
   const btn=document.getElementById('btn-salvar-entrega'); btn.disabled=true;
   let data, error;
