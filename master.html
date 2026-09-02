@@ -1008,13 +1008,8 @@
       <div class="field"><label>Endereço de Entrega</label><input id="v-end-rua" placeholder="Rua / Avenida / Logradouro"></div>
       <div class="grid3">
         <div class="field"><label>Número</label><input id="v-end-num" placeholder="Nº"></div>
-        <div class="field"><label>Cidade</label><select id="v-end-cidade" style="border:1.5px solid var(--borda);border-radius:8px;padding:8px 12px;font-size:14px;background:#fff;width:100%"><option value="">Selecione o estado primeiro</option></select></div>
-        <div class="field"><label>Estado</label>
-          <select id="v-end-estado" onchange="popularCidades('v-end-estado','v-end-cidade')" style="border:1.5px solid var(--borda);border-radius:8px;padding:8px 12px;font-size:14px;background:#fff;width:100%">
-            <option value="">UF</option>
-            <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option><option value="AM">AM</option><option value="BA">BA</option><option value="CE">CE</option><option value="DF">DF</option><option value="ES">ES</option><option value="GO">GO</option><option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option><option value="MG">MG</option><option value="PA">PA</option><option value="PB">PB</option><option value="PR">PR</option><option value="PE">PE</option><option value="PI">PI</option><option value="RJ">RJ</option><option value="RN">RN</option><option value="RS">RS</option><option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option><option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option>
-          </select>
-        </div>
+        <div class="field"><label>Cidade</label><input id="v-end-cidade" placeholder="Cidade"></div>
+        <div class="field"><label>Estado</label><input id="v-end-estado" placeholder="UF" maxlength="2" style="text-transform:uppercase"></div>
       </div>
       <div style="font-size:12px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Itens da Venda</div>
       <div id="itens-venda-lista"></div>
@@ -1407,45 +1402,6 @@ async function carregarTudo(){
     funcionarios = fu.data||[];
   } catch(e){ funcionarios = []; }
   empresaLogoBase64 = empresa.logoUrl ? await carregarLogoBase64(empresa.logoUrl) : null;
-}
-
-// ─── CIDADES POR ESTADO ───────────────────────────────────────────────────────
-const CIDADES = {
-  AC:["Acrelândia","Assis Brasil","Brasiléia","Bujari","Capixaba","Cruzeiro do Sul","Epitaciolândia","Feijó","Jordão","Mâncio Lima","Manoel Urbano","Marechal Thaumaturgo","Plácido de Castro","Porto Acre","Porto Walter","Rio Branco","Rodrigues Alves","Santa Rosa do Purus","Sena Madureira","Senador Guiomard","Tarauacá","Xapuri"],
-  AL:["Água Branca","Anadia","Arapiraca","Atalaia","Barra de Santo Antônio","Batalha","Boca da Mata","Cajueiro","Campestre","Campo Alegre","Coruripe","Delmiro Gouveia","Dois Riachos","Feira Grande","Girau do Ponciano","Igreja Nova","Joaquim Gomes","Junqueiro","Lagoa da Canoa","Limoeiro de Anadia","Maceió","Major Isidoro","Marechal Deodoro","Mata Grande","Maravilha","Minador do Negrão","Murici","Olho d'Água das Flores","Palmeira dos Índios","Paripueira","Passo de Camaragibe","Paulo Jacinto","Penedo","Pilar","Pindoba","Piranhas","Porto Calvo","Porto de Pedras","Porto Real do Colégio","Rio Largo","Roteiro","Santa Luzia do Norte","Santana do Ipanema","São Brás","São José da Laje","São Luís do Quitunde","São Miguel dos Campos","Taquarana","Traipu","União dos Palmares","Viçosa"],
-  AP:["Amapá","Calçoene","Cutias","Ferreira Gomes","Itaubal","Laranjal do Jari","Macapá","Mazagão","Oiapoque","Pedra Branca do Amapari","Porto Grande","Pracuúba","Santana","Serra do Navio","Tartarugalzinho","Vitória do Jari"],
-  AM:["Alvarães","Amaturá","Anamã","Anori","Apuí","Atalaia do Norte","Autazes","Barcelos","Barreirinha","Benjamin Constant","Beruri","Boa Vista do Ramos","Boca do Acre","Borba","Caapiranga","Canutama","Carauari","Careiro","Careiro da Várzea","Coari","Codajás","Eirunepé","Envira","Fonte Boa","Guajará","Humaitá","Ipixuna","Iranduba","Itacoatiara","Itamarati","Itapiranga","Japurá","Juruá","Jutaí","Lábrea","Manacapuru","Manaquiri","Manaus","Manicoré","Maraã","Maués","Nhamundá","Nova Olinda do Norte","Novo Airão","Novo Aripuanã","Parintins","Pauini","Presidente Figueiredo","Rio Preto da Eva","Santa Isabel do Rio Negro","Santo Antônio do Içá","São Gabriel da Cachoeira","São Paulo de Olivença","Silves","Tabatinga","Tapauá","Tefé","Tonantins","Uarini","Urucará","Urucurituba"],
-  BA:["Alagoinhas","Barreiras","Brumado","Camaçari","Caravelas","Cruz das Almas","Dias d'Ávila","Eunápolis","Feira de Santana","Guanambi","Ilhéus","Ipiaú","Itabuna","Itamaraju","Itapetinga","Jacobina","Jequié","Juazeiro","Lauro de Freitas","Luís Eduardo Magalhães","Madre de Deus","Paulo Afonso","Porto Seguro","Ribeira do Pombal","Salvador","Santa Maria da Vitória","Santo Antônio de Jesus","Santo Antônio de Lisboa","Simões Filho","Teixeira de Freitas","Valença","Vitória da Conquista","Xique-Xique"],
-  CE:["Aquiraz","Barbalha","Brejo Santo","Camocim","Canindé","Caucaia","Crato","Fortaleza","Horizonte","Iguatu","Itapipoca","Juazeiro do Norte","Juazeiro","Maracanaú","Maranguape","Pacatuba","Quixadá","Quixeramobim","Russas","Sobral","Tianguá","Trairi"],
-  DF:["Brasília","Ceilândia","Gama","Guará","Planaltina","Samambaia","Santa Maria","Sobradinho","Taguatinga","Recanto das Emas","São Sebastião","Riacho Fundo"],
-  ES:["Afonso Cláudio","Alegre","Alfredo Chaves","Alto Rio Novo","Anchieta","Aracruz","Atilio Vivacqua","Baixo Guandu","Barra de São Francisco","Boa Esperança","Bom Jesus do Norte","Brejetuba","Cachoeiro de Itapemirim","Cariacica","Castelo","Colatina","Conceição da Barra","Conceição do Castelo","Divino de São Lourenço","Domingos Martins","Dores do Rio Preto","Ecoporanga","Fundão","Governador Lindenberg","Guaçuí","Guarapari","Ibatiba","Ibiraçu","Ibitirama","Iconha","Irupi","Itaguaçu","Itapemirim","Itarana","Iúna","Jaguaré","Jerônimo Monteiro","João Neiva","Laranja da Terra","Linhares","Mantenópolis","Marataízes","Marechal Floriano","Marilândia","Mimoso do Sul","Montanha","Mucurici","Muniz Freire","Muqui","Nova Venécia","Pancas","Pedro Canário","Pinheiros","Piúma","Ponto Belo","Presidente Kennedy","Rio Bananal","Rio Novo do Sul","Santa Leopoldina","Santa Maria de Jetibá","Santa Teresa","São Domingos do Norte","São Gabriel da Palha","São José do Calçado","São Mateus","São Roque do Canaã","Serra","Sooretama","Vargem Alta","Venda Nova do Imigrante","Viana","Vila Pavão","Vila Valério","Vila Velha","Vitória"],
-  GO:["Águas Lindas de Goiás","Alexânia","Anápolis","Aparecida de Goiânia","Catalão","Cidade Ocidental","Cocalzinho de Goiás","Cristalina","Formosa","Goiânia","Goiás","Inhumas","Itumbiara","Jataí","Luziânia","Mineiros","Morrinhos","Novo Gama","Planaltina","Quirinópolis","Rio Verde","Senador Canedo","Trindade","Valparaíso de Goiás"],
-  MA:["Açailândia","Bacabal","Balsas","Barra do Corda","Barreirinhas","Caxias","Chapadinha","Codó","Coelho Neto","Coroatá","Estreito","Grajaú","Imperatriz","João Lisboa","Lago da Pedra","Loreto","Presidente Dutra","Santa Inês","São João dos Patos","São Luís","Timon","Viana","Zé Doca"],
-  MT:["Alta Floresta","Alto Araguaia","Barra do Garças","Campo Novo do Parecis","Campo Verde","Cáceres","Cuiabá","Lucas do Rio Verde","Matupá","Primavera do Leste","Rondonópolis","Sinop","Sorriso","Tangará da Serra","Várzea Grande"],
-  MS:["Aquidauana","Campo Grande","Corumbá","Coxim","Dourados","Jardim","Naviraí","Nova Andradina","Paranaíba","Ponta Porã","São Gabriel do Oeste","Sidrolândia","Três Lagoas"],
-  MG:["Alfenas","Araguari","Araxá","Barbacena","Belo Horizonte","Betim","Brumadinho","Caratinga","Conselheiro Lafaiete","Contagem","Coronel Fabriciano","Divinópolis","Formiga","Governador Valadares","Ibirité","Ipatinga","Itabira","Itajubá","Ituiutaba","Januária","João Monlevade","Juiz de Fora","Lagoa Santa","Lavras","Manhuaçu","Mariana","Montes Claros","Muriaé","Nova Lima","Nova Serrana","Passos","Patos de Minas","Patrocínio","Pedra Azul","Poços de Caldas","Pouso Alegre","Ribeirão das Neves","Sabará","Santa Luzia","São João del-Rei","São Sebastião do Paraíso","Sete Lagoas","Teófilo Otoni","Timóteo","Uberaba","Uberlândia","Varginha","Viçosa"],
-  PA:["Abaetetuba","Altamira","Ananindeua","Barcarena","Belém","Benevides","Breves","Bragança","Capanema","Castanhal","Dom Eliseu","Itaituba","Jacundá","Marituba","Marabá","Marapanim","Moju","Monte Alegre","Paragominas","Redenção","Salinópolis","Santarém","São Félix do Xingu","Tomé-Açu","Tucuruí","Xinguara"],
-  PB:["Bayeux","Cabedelo","Cajazeiras","Campina Grande","Guarabira","João Pessoa","Patos","Queimadas","Santa Rita","Sousa"],
-  PR:["Almirante Tamandaré","Apucarana","Araucária","Campo Largo","Campo Mourão","Cascavel","Colombo","Curitiba","Foz do Iguaçu","Francisco Beltrão","Guarapuava","Londrina","Maringá","Paranaguá","Paranavaí","Pato Branco","Pinhais","Piraquara","Ponta Grossa","São José dos Pinhais","Toledo","Umuarama","União da Vitória"],
-  PE:["Abreu e Lima","Cabo de Santo Agostinho","Caruaru","Garanhuns","Igarassu","Ipojuca","Jaboatão dos Guararapes","Olinda","Palmares","Paulista","Petrolina","Recife","Santa Cruz do Capibaribe","Serra Talhada","Vitória de Santo Antão"],
-  PI:["Altos","Barras","Campo Maior","Corrente","Floriano","Oeiras","Parnaíba","Picos","Piripiri","São Raimundo Nonato","Teresina","União"],
-  RJ:["Angra dos Reis","Belford Roxo","Cabo Frio","Campos dos Goytacazes","Duque de Caxias","Itaboraí","Itaguaí","Macaé","Magé","Maricá","Mesquita","Niterói","Nova Friburgo","Nova Iguaçu","Petrópolis","Queimados","Rio de Janeiro","São Gonçalo","São João de Meriti","Teresópolis","Três Rios","Volta Redonda"],
-  RN:["Açu","Caicó","Ceará-Mirim","Currais Novos","Macaíba","Mossoró","Natal","Parnamirim","Santa Cruz","São Gonçalo do Amarante"],
-  RS:["Alvorada","Bagé","Bento Gonçalves","Cachoeirinha","Canoas","Caxias do Sul","Erechim","Gravataí","Guaíba","Ijuí","Novo Hamburgo","Passo Fundo","Pelotas","Porto Alegre","Santa Cruz do Sul","Santa Maria","Santana do Livramento","São Leopoldo","Uruguaiana","Viamão"],
-  RO:["Ariquemes","Cacoal","Guajará-Mirim","Ji-Paraná","Ouro Preto do Oeste","Porto Velho","Rolim de Moura","Vilhena"],
-  RR:["Alto Alegre","Amajari","Boa Vista","Bonfim","Cantá","Caracaraí","Caroebe","Iracema","Mucajaí","Normandia","Pacaraima","Rorainópolis","São João da Baliza","São Luiz","Uiramutã"],
-  SC:["Balneário Camboriú","Biguaçu","Blumenau","Caçador","Chapecó","Concórdia","Criciúma","Florianópolis","Itajaí","Jaraguá do Sul","Joaçaba","Joinville","Lages","Palhoça","Rio do Sul","São José","Tubarão","Videira"],
-  SP:["Americana","Araçatuba","Araraquara","Araras","Assis","Barretos","Bauru","Botucatu","Campinas","Campos do Jordão","Catanduva","Diadema","Embu das Artes","Ferraz de Vasconcelos","Franca","Guarujá","Guarulhos","Hortolândia","Indaiatuba","Itapecerica da Serra","Itapetininga","Itapevi","Itaquaquecetuba","Itu","Jacareí","Jundiaí","Limeira","Lins","Marília","Mauá","Mogi das Cruzes","Mogi Guaçu","Osasco","Ourinhos","Piracicaba","Poá","Praia Grande","Presidente Prudente","Ribeirão Preto","Rio Claro","Santos","São Bernardo do Campo","São Caetano do Sul","São Carlos","São José do Rio Preto","São José dos Campos","São Paulo","São Vicente","Sorocaba","Suzano","Taboão da Serra","Taubaté","Votorantim"],
-  SE:["Aracaju","Barra dos Coqueiros","Estância","Itabaiana","Lagarto","Laranjeiras","Nossa Senhora do Socorro","São Cristóvão"],
-  TO:["Araguaína","Araguatins","Colinas do Tocantins","Dianópolis","Gurupi","Miracema do Tocantins","Palmas","Paraíso do Tocantins","Porto Nacional","Tocantinópolis"]
-};
-function popularCidades(idEstado, idCidade){
-  const uf = document.getElementById(idEstado)?.value;
-  const sel = document.getElementById(idCidade);
-  if(!sel) return;
-  if(!uf){ sel.innerHTML='<option value="">Selecione o estado primeiro</option>'; return; }
-  const lista = CIDADES[uf] || [];
-  sel.innerHTML='<option value="">Selecione a cidade</option>' + lista.map(c=>`<option value="${c}">${c}</option>`).join('');
 }
 
 // ─── SIDEBAR / NAVEGAÇÃO ──────────────────────────────────────────────────────
@@ -2838,7 +2794,6 @@ function editarVenda(id){
   document.getElementById('v-end-rua').value=v.endRua||'';
   document.getElementById('v-end-num').value=v.endNum||'';
   document.getElementById('v-end-estado').value=v.endEstado||'';
-  popularCidades('v-end-estado','v-end-cidade');
   document.getElementById('v-end-cidade').value=v.endCidade||'';
   document.getElementById('v-pgto').value=v.pgto;
   onPgtoChange();
