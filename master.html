@@ -362,6 +362,17 @@
 
   <!-- DASHBOARD -->
   <div id="aba-dashboard" class="aba ativo">
+    <div class="toolbar" style="margin-bottom:14px">
+      <select id="dash-periodo" onchange="toggleDashPersonalizado();renderDash()">
+        <option value="mes-atual">Mês Atual</option>
+        <option value="mes-anterior">Mês Anterior</option>
+        <option value="todos">Todos os Períodos</option>
+        <option value="personalizado">Personalizado</option>
+      </select>
+      <input type="date" id="dash-data-de" style="display:none" onchange="renderDash()">
+      <input type="date" id="dash-data-ate" style="display:none" onchange="renderDash()">
+      <span style="font-size:12px;color:var(--sub);align-self:center">Os cartões de Vendas/Recebido/Cancelado refletem o período selecionado.</span>
+    </div>
     <div class="kpi-grid" id="kpi-grid"></div>
     <div class="grid-2" style="margin-bottom:22px">
       <div class="card">
@@ -519,6 +530,16 @@
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         Nova Venda
       </button>
+    </div>
+    <div class="toolbar" style="margin-bottom:10px">
+      <select id="vkpi-periodo" onchange="toggleVKpiPersonalizado();renderVendas()">
+        <option value="mes-atual">Resumo: Mês Atual</option>
+        <option value="mes-anterior">Resumo: Mês Anterior</option>
+        <option value="todos">Resumo: Todos os Períodos</option>
+        <option value="personalizado">Resumo: Personalizado</option>
+      </select>
+      <input type="date" id="vkpi-data-de" style="display:none" onchange="renderVendas()">
+      <input type="date" id="vkpi-data-ate" style="display:none" onchange="renderVendas()">
     </div>
     <div id="kpi-vendas" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:18px"></div>
     <div class="tbl-wrap">
@@ -1462,21 +1483,60 @@ function irAba(id){
 function fecharModal(id){ document.getElementById('modal-'+id).classList.remove('open'); }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
+function toggleDashPersonalizado(){
+  const mostra=document.getElementById('dash-periodo').value==='personalizado';
+  document.getElementById('dash-data-de').style.display=mostra?'block':'none';
+  document.getElementById('dash-data-ate').style.display=mostra?'block':'none';
+}
+function toggleVKpiPersonalizado(){
+  const mostra=document.getElementById('vkpi-periodo').value==='personalizado';
+  document.getElementById('vkpi-data-de').style.display=mostra?'block':'none';
+  document.getElementById('vkpi-data-ate').style.display=mostra?'block':'none';
+}
+function getPeriodoRange(prefix){
+  const sel=document.getElementById(prefix+'-periodo')?.value||'mes-atual';
+  const hoje=new Date();
+  if(sel==='mes-atual'){
+    const inicio=new Date(hoje.getFullYear(),hoje.getMonth(),1);
+    const fim=new Date(hoje.getFullYear(),hoje.getMonth()+1,0);
+    return { de:inicio.toISOString().slice(0,10), ate:fim.toISOString().slice(0,10), todos:false };
+  }
+  if(sel==='mes-anterior'){
+    const inicio=new Date(hoje.getFullYear(),hoje.getMonth()-1,1);
+    const fim=new Date(hoje.getFullYear(),hoje.getMonth(),0);
+    return { de:inicio.toISOString().slice(0,10), ate:fim.toISOString().slice(0,10), todos:false };
+  }
+  if(sel==='personalizado'){
+    const de=document.getElementById(prefix+'-data-de')?.value||null;
+    const ate=document.getElementById(prefix+'-data-ate')?.value||null;
+    return { de, ate, todos:false };
+  }
+  return { de:null, ate:null, todos:true };
+}
+function dentroDoPeriodo(dataISO, range){
+  if(range.todos) return true;
+  if(!dataISO) return false;
+  if(range.de && dataISO<range.de) return false;
+  if(range.ate && dataISO>range.ate) return false;
+  return true;
+}
 function renderDash(){
   const aProd = produtos.filter(p=>p.qtd<p.minimo);
   const aMP = materias.filter(m=>m.qtd<m.minimo);
   const total = aProd.length + aMP.length;
   const vProd = produtos.reduce((a,p)=>a+p.qtd*p.custo,0);
   const vMP = materias.reduce((a,m)=>a+m.qtd*m.custo,0);
-  const vendasAtivasDash = vendas.filter(v=>v.status!=='cancelado');
-  const vendasCanceladasDash = vendas.filter(v=>v.status==='cancelado');
+  const rangeDash = getPeriodoRange('dash');
+  const vendasAtivasDash = vendas.filter(v=>v.status!=='cancelado' && dentroDoPeriodo(v.dataISO,rangeDash));
+  const vendasCanceladasDash = vendas.filter(v=>v.status==='cancelado' && dentroDoPeriodo(v.dataISO,rangeDash));
   const totalVendidoDash = vendasAtivasDash.reduce((a,v)=>a+v.total,0);
   const totalRecebidoDash = vendasAtivasDash.filter(v=>v.pgtoRecebido==='sim').reduce((a,v)=>a+v.total,0);
   const totalCanceladoDash = vendasCanceladasDash.reduce((a,v)=>a+v.total,0);
   const totalPendenteDash = vendasAtivasDash.filter(v=>v.pgtoRecebido!=='sim').reduce((a,v)=>a+v.total,0);
+  const vendasAtivasTodas = vendas.filter(v=>v.status!=='cancelado');
   const hoje3 = new Date();
   const proxMesData = new Date(hoje3.getFullYear(), hoje3.getMonth()+1, 1);
-  const aReceberProxMes = vendasAtivasDash.filter(v=>{
+  const aReceberProxMes = vendasAtivasTodas.filter(v=>{
     if(v.pgtoRecebido==='sim' || !v.previsaoISO) return false;
     const d = new Date(v.previsaoISO+'T12:00:00');
     return d.getMonth()===proxMesData.getMonth() && d.getFullYear()===proxMesData.getFullYear();
@@ -2648,8 +2708,9 @@ function renderVendas(){
     const el=document.getElementById('sa-v-'+c);
     if(el) el.textContent = sortVendas.col===c ? (sortVendas.dir===1?' ▲':' ▼') : '';
   });
-  const vendasAtivas=vendas.filter(v=>v.status!=='cancelado');
-  const vendasCanceladas=vendas.filter(v=>v.status==='cancelado');
+  const rangeVKpi=getPeriodoRange('vkpi');
+  const vendasAtivas=vendas.filter(v=>v.status!=='cancelado' && dentroDoPeriodo(v.dataISO,rangeVKpi));
+  const vendasCanceladas=vendas.filter(v=>v.status==='cancelado' && dentroDoPeriodo(v.dataISO,rangeVKpi));
   const totalVendido=vendasAtivas.reduce((a,v)=>a+v.total,0);
   const totalRecebido=vendasAtivas.filter(v=>v.pgtoRecebido==='sim').reduce((a,v)=>a+v.total,0);
   const totalPendente=totalVendido-totalRecebido;
