@@ -523,7 +523,19 @@
     <div id="kpi-vendas" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:18px"></div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>#</th><th>Data</th><th>Cliente</th><th>Vendedora</th><th>Itens</th><th>Subtotal</th><th>Desconto</th><th>Total</th><th>Taxa Maq.</th><th>Líquido</th><th>Pgto Recebido</th><th>Status</th><th>Entrega</th><th></th></tr></thead>
+        <thead><tr>
+          <th onclick="ordenarVendas('id')" style="cursor:pointer;user-select:none">#<span id="sa-v-id"></span></th>
+          <th onclick="ordenarVendas('data')" style="cursor:pointer;user-select:none">Data<span id="sa-v-data"></span></th>
+          <th onclick="ordenarVendas('cliente')" style="cursor:pointer;user-select:none">Cliente<span id="sa-v-cliente"></span></th>
+          <th onclick="ordenarVendas('vendedora')" style="cursor:pointer;user-select:none">Vendedora<span id="sa-v-vendedora"></span></th>
+          <th>Itens</th><th>Subtotal</th><th>Desconto</th>
+          <th onclick="ordenarVendas('total')" style="cursor:pointer;user-select:none">Total<span id="sa-v-total"></span></th>
+          <th>Taxa Maq.</th><th>Líquido</th>
+          <th onclick="ordenarVendas('pgto')" style="cursor:pointer;user-select:none">Pgto Recebido<span id="sa-v-pgto"></span></th>
+          <th onclick="ordenarVendas('status')" style="cursor:pointer;user-select:none">Status<span id="sa-v-status"></span></th>
+          <th onclick="ordenarVendas('previsao')" style="cursor:pointer;user-select:none">Entrega<span id="sa-v-previsao"></span></th>
+          <th></th>
+        </tr></thead>
         <tbody id="tbody-vendas"></tbody>
       </table>
     </div>
@@ -595,7 +607,18 @@
     </div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th>#</th><th>Data</th><th>Período</th><th>Cliente</th><th>Endereço</th><th>Itens</th><th>Vendedora</th><th>Entregador</th><th>Venda</th><th>Status</th><th>Obs.</th><th></th></tr></thead>
+        <thead><tr>
+          <th onclick="ordenarEntregas('id')" style="cursor:pointer;user-select:none">#<span id="sa-e-id"></span></th>
+          <th onclick="ordenarEntregas('data')" style="cursor:pointer;user-select:none">Data<span id="sa-e-data"></span></th>
+          <th onclick="ordenarEntregas('periodo')" style="cursor:pointer;user-select:none">Período<span id="sa-e-periodo"></span></th>
+          <th onclick="ordenarEntregas('cliente')" style="cursor:pointer;user-select:none">Cliente<span id="sa-e-cliente"></span></th>
+          <th>Endereço</th><th>Itens</th>
+          <th onclick="ordenarEntregas('vendedora')" style="cursor:pointer;user-select:none">Vendedora<span id="sa-e-vendedora"></span></th>
+          <th onclick="ordenarEntregas('entregador')" style="cursor:pointer;user-select:none">Entregador<span id="sa-e-entregador"></span></th>
+          <th>Venda</th>
+          <th onclick="ordenarEntregas('status')" style="cursor:pointer;user-select:none">Status<span id="sa-e-status"></span></th>
+          <th>Obs.</th><th></th>
+        </tr></thead>
         <tbody id="tbody-entregas"></tbody>
       </table>
     </div>
@@ -1302,6 +1325,16 @@ async function carregarLogoBase64(url){
   } catch(e){ return null; }
 }
 let semanaOffset = 0;
+let sortVendas = {col:null, dir:1};
+let sortEntregas = {col:null, dir:1};
+function ordenarVendas(col){
+  if(sortVendas.col===col) sortVendas.dir*=-1; else { sortVendas.col=col; sortVendas.dir=1; }
+  renderVendas();
+}
+function ordenarEntregas(col){
+  if(sortEntregas.col===col) sortEntregas.dir*=-1; else { sortEntregas.col=col; sortEntregas.dir=1; }
+  renderEntregas();
+}
 let editandoVenda = null, editandoEntrega = null, editandoVendedora = null, editandoEntregador = null;
 let editandoMP = null, editandoProd = null;
 let itensVendaTemp = [];
@@ -2591,7 +2624,30 @@ function renderVendas(){
     const mv=filtroVend==='todas'||String(v.vendedoraId)===filtroVend;
     const mp=filtroPgto==='todos'||(filtroPgto==='sim'&&v.pgtoRecebido==='sim')||(filtroPgto==='nao'&&v.pgtoRecebido!=='sim');
     return mb&&ms&&mv&&mp;
-  }).sort((a,b)=>(b.dataISO||'').localeCompare(a.dataISO||'')||(new Date(b.criadoEm||0))-(new Date(a.criadoEm||0))||b.id-a.id);
+  });
+  if(sortVendas.col){
+    const dir=sortVendas.dir, col=sortVendas.col;
+    lista.sort((a,b)=>{
+      let va,vb;
+      if(col==='id'){ va=a.id; vb=b.id; }
+      else if(col==='data'){ va=a.dataISO||''; vb=b.dataISO||''; }
+      else if(col==='cliente'){ va=(a.cliente||'').toLowerCase(); vb=(b.cliente||'').toLowerCase(); }
+      else if(col==='vendedora'){ va=(vendedoras.find(x=>x.id==a.vendedoraId)?.nome||'').toLowerCase(); vb=(vendedoras.find(x=>x.id==b.vendedoraId)?.nome||'').toLowerCase(); }
+      else if(col==='total'){ va=a.total; vb=b.total; }
+      else if(col==='pgto'){ va=a.pgtoRecebido||''; vb=b.pgtoRecebido||''; }
+      else if(col==='status'){ va=a.status||''; vb=b.status||''; }
+      else if(col==='previsao'){ va=a.previsaoISO||''; vb=b.previsaoISO||''; }
+      if(va<vb) return -1*dir;
+      if(va>vb) return 1*dir;
+      return 0;
+    });
+  } else {
+    lista.sort((a,b)=>(b.dataISO||'').localeCompare(a.dataISO||'')||(new Date(b.criadoEm||0))-(new Date(a.criadoEm||0))||b.id-a.id);
+  }
+  ['id','data','cliente','vendedora','total','pgto','status','previsao'].forEach(c=>{
+    const el=document.getElementById('sa-v-'+c);
+    if(el) el.textContent = sortVendas.col===c ? (sortVendas.dir===1?' ▲':' ▼') : '';
+  });
   const vendasAtivas=vendas.filter(v=>v.status!=='cancelado');
   const vendasCanceladas=vendas.filter(v=>v.status==='cancelado');
   const totalVendido=vendasAtivas.reduce((a,v)=>a+v.total,0);
@@ -3062,7 +3118,34 @@ function renderEntregas(){
     const ms=filtroSt==='todos'||e.status===filtroSt;
     const me=filtroEnt==='todos'||String(e.entregadorId)===filtroEnt;
     return mb&&ms&&me;
-  }).sort((a,b)=>a.dataISO>b.dataISO?1:-1);
+  });
+  if(sortEntregas.col){
+    const dir=sortEntregas.dir, col=sortEntregas.col;
+    lista.sort((a,b)=>{
+      let va,vb;
+      if(col==='id'){ va=a.id; vb=b.id; }
+      else if(col==='data'){ va=a.dataISO||''; vb=b.dataISO||''; }
+      else if(col==='periodo'){ va=a.periodo||''; vb=b.periodo||''; }
+      else if(col==='cliente'){ va=(a.cliente||'').toLowerCase(); vb=(b.cliente||'').toLowerCase(); }
+      else if(col==='vendedora'){
+        const vA=a.vendaId?vendas.find(v=>v.id==a.vendaId):null, vB=b.vendaId?vendas.find(v=>v.id==b.vendaId):null;
+        va=(vA?.vendedoraId?vendedoras.find(x=>x.id==vA.vendedoraId)?.nome:'')||'';
+        vb=(vB?.vendedoraId?vendedoras.find(x=>x.id==vB.vendedoraId)?.nome:'')||'';
+        va=va.toLowerCase(); vb=vb.toLowerCase();
+      }
+      else if(col==='entregador'){ va=(entregadores.find(x=>x.id==a.entregadorId)?.nome||'').toLowerCase(); vb=(entregadores.find(x=>x.id==b.entregadorId)?.nome||'').toLowerCase(); }
+      else if(col==='status'){ va=a.status||''; vb=b.status||''; }
+      if(va<vb) return -1*dir;
+      if(va>vb) return 1*dir;
+      return 0;
+    });
+  } else {
+    lista.sort((a,b)=>a.dataISO>b.dataISO?1:-1);
+  }
+  ['id','data','periodo','cliente','vendedora','entregador','status'].forEach(c=>{
+    const el=document.getElementById('sa-e-'+c);
+    if(el) el.textContent = sortEntregas.col===c ? (sortEntregas.dir===1?' ▲':' ▼') : '';
+  });
   const tbody=document.getElementById('tbody-entregas');
   if(!lista.length){ tbody.innerHTML=`<tr><td colspan="12" class="sem-dados">Nenhuma entrega agendada.</td></tr>`; return; }
   tbody.innerHTML=lista.map(trEntrega).join('');
