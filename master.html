@@ -1526,7 +1526,6 @@ function dentroDoPeriodo(dataISO, range){
 function renderDash(){
   const aProd = produtos.filter(p=>p.qtd<p.minimo);
   const aMP = materias.filter(m=>m.qtd<m.minimo);
-  const total = aProd.length + aMP.length;
   const vProd = produtos.reduce((a,p)=>a+p.qtd*p.custo,0);
   const vMP = materias.reduce((a,m)=>a+m.qtd*m.custo,0);
   const rangeDash = getPeriodoRange('dash');
@@ -1565,7 +1564,6 @@ function renderDash(){
     {l:'Matérias-Primas',v:materias.length,s:'itens cadastrados',cor:'#1A7A4A'},
     {l:'Valor Estoque Produtos',v:fmtR(vProd),s:'a preço de custo',cor:'#2E6BC4'},
     {l:'Valor Estoque MP',v:fmtR(vMP),s:'matérias-primas',cor:'#22A05B'},
-    {l:'Alertas de Estoque',v:total,s:aMP.length+' MP · '+aProd.length+' produtos',cor:total>0?'#EF4444':'#22A05B'},
     {l:'Movimentações',v:movimentacoes.length,s:'registradas',cor:'#F59E0B'},
   ];
   document.getElementById('kpi-grid').innerHTML = kpis.map(k=>`<div class="kpi" style="border-left:5px solid ${k.cor}"><div class="kpi-label">${k.l}</div><div class="kpi-valor">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');
