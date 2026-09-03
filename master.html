@@ -1389,7 +1389,7 @@ function vendaFromRow(r){
     pgtoRecebido:r.pgto_recebido||'nao', vendedoraId:r.vendedora_id, perfilVendedoraId:r.perfil_vendedora_id,
     status:r.status, data:fmtDataBR(r.data_venda), dataISO:r.data_venda||'',
     previsao:fmtDataBR(r.previsao_iso), previsaoISO:r.previsao_iso||'',
-    obs:r.obs||'', criadoEm:r.criado_em||''
+    obs:r.obs||'', criadoEm:r.criado_em||'', dataRecebimento:r.data_recebimento||''
   };
 }
 function vendaToRow(obj){
@@ -1401,7 +1401,7 @@ function vendaToRow(obj){
     taxa_pct:obj.taxaPct, taxa_valor:obj.taxaValor, valor_liquido:obj.valorLiquido,
     pgto2:obj.pgto2||null, bandeira2:obj.bandeira2||null, parcelas2:obj.parcelas2?String(obj.parcelas2):null,
     taxa_pct2:obj.taxaPct2||0, taxa_valor2:obj.taxaValor2||0, valor2:obj.valor2||0,
-    pgto_recebido:obj.pgtoRecebido, vendedora_id:obj.vendedoraId||null, perfil_vendedora_id:obj.perfilVendedoraId||null,
+    pgto_recebido:obj.pgtoRecebido, data_recebimento:obj.dataRecebimento||null, vendedora_id:obj.vendedoraId||null, perfil_vendedora_id:obj.perfilVendedoraId||null,
     status:obj.status, previsao_iso:obj.previsaoISO||null, obs:obj.obs, data_venda:obj.dataISO
   };
 }
@@ -1530,13 +1530,17 @@ function renderDash(){
   const vProd = produtos.reduce((a,p)=>a+p.qtd*p.custo,0);
   const vMP = materias.reduce((a,m)=>a+m.qtd*m.custo,0);
   const rangeDash = getPeriodoRange('dash');
-  const vendasAtivasDash = vendas.filter(v=>v.status!=='cancelado' && dentroDoPeriodo(v.dataISO,rangeDash));
-  const vendasCanceladasDash = vendas.filter(v=>v.status==='cancelado' && dentroDoPeriodo(v.dataISO,rangeDash));
+  const vendasAtivasTodas = vendas.filter(v=>v.status!=='cancelado');
+  const vendasCanceladasTodas = vendas.filter(v=>v.status==='cancelado');
+  const vendasAtivasDash = vendasAtivasTodas.filter(v=>dentroDoPeriodo(v.dataISO,rangeDash));
+  const vendasCanceladasDash = vendasCanceladasTodas.filter(v=>dentroDoPeriodo(v.dataISO,rangeDash));
   const totalVendidoDash = vendasAtivasDash.reduce((a,v)=>a+v.total,0);
-  const totalRecebidoDash = vendasAtivasDash.filter(v=>v.pgtoRecebido==='sim').reduce((a,v)=>a+v.total,0);
   const totalCanceladoDash = vendasCanceladasDash.reduce((a,v)=>a+v.total,0);
   const totalPendenteDash = vendasAtivasDash.filter(v=>v.pgtoRecebido!=='sim').reduce((a,v)=>a+v.total,0);
-  const vendasAtivasTodas = vendas.filter(v=>v.status!=='cancelado');
+  // "Recebido" usa a data em que o pagamento foi de fato marcado como recebido, nao a data da venda -
+  // assim uma venda de agosto recebida em setembro conta em setembro, nao em agosto.
+  const recebidosNoPeriodo = vendasAtivasTodas.filter(v=>v.pgtoRecebido==='sim' && dentroDoPeriodo(v.dataRecebimento||v.dataISO,rangeDash));
+  const totalRecebidoDash = recebidosNoPeriodo.reduce((a,v)=>a+v.total,0);
   const hoje3 = new Date();
   const proxMesData = new Date(hoje3.getFullYear(), hoje3.getMonth()+1, 1);
   const aReceberProxMes = vendasAtivasTodas.filter(v=>{
@@ -1544,11 +1548,16 @@ function renderDash(){
     const d = new Date(v.previsaoISO+'T12:00:00');
     return d.getMonth()===proxMesData.getMonth() && d.getFullYear()===proxMesData.getFullYear();
   }).reduce((a,v)=>a+v.total,0);
+  const inicioMesAnt = new Date(hoje3.getFullYear(), hoje3.getMonth()-1, 1);
+  const fimMesAnt = new Date(hoje3.getFullYear(), hoje3.getMonth(), 0);
+  const rangeMesAnt = { de:inicioMesAnt.toISOString().slice(0,10), ate:fimMesAnt.toISOString().slice(0,10), todos:false };
+  const aReceberMesAnterior = vendasAtivasTodas.filter(v=>v.pgtoRecebido!=='sim' && dentroDoPeriodo(v.dataISO,rangeMesAnt)).reduce((a,v)=>a+v.total,0);
   const posVendaAbertos = posVendas.filter(p=>p.status!=='concluido').length;
   const kpis = [
     {l:'Vendas (sem cancelados)',v:vendasAtivasDash.length,s:fmtR(totalVendidoDash),cor:'#2E6BC4'},
-    {l:'Recebido',v:fmtR(totalRecebidoDash),s:'pagamentos confirmados',cor:'#22A05B'},
+    {l:'Recebido',v:fmtR(totalRecebidoDash),s:'pagamentos confirmados no período',cor:'#22A05B'},
     {l:'A Receber',v:fmtR(totalPendenteDash),s:'pagamentos pendentes',cor:'#F59E0B'},
+    {l:'A Receber — Mês Anterior',v:fmtR(aReceberMesAnterior),s:'vendido em '+inicioMesAnt.toLocaleDateString('pt-BR',{month:'long',year:'numeric'})+', ainda pendente',cor:'#DC2626'},
     {l:'A Receber — Próximo Mês',v:fmtR(aReceberProxMes),s:'entregas previstas em '+proxMesData.toLocaleDateString('pt-BR',{month:'long',year:'numeric'}),cor:'#B45309'},
     {l:'Cancelado',v:fmtR(totalCanceladoDash),s:vendasCanceladasDash.length+' venda(s) não contadas',cor:'#B91C1C'},
     {l:'Pós-vendas em Aberto',v:posVendaAbertos,s:posVendas.length+' no total',cor:'#B45309'},
@@ -2714,11 +2723,13 @@ function renderVendas(){
     if(el) el.textContent = sortVendas.col===c ? (sortVendas.dir===1?' ▲':' ▼') : '';
   });
   const rangeVKpi=getPeriodoRange('vkpi');
-  const vendasAtivas=vendas.filter(v=>v.status!=='cancelado' && dentroDoPeriodo(v.dataISO,rangeVKpi));
+  const vendasAtivasTodasVK=vendas.filter(v=>v.status!=='cancelado');
+  const vendasAtivas=vendasAtivasTodasVK.filter(v=>dentroDoPeriodo(v.dataISO,rangeVKpi));
   const vendasCanceladas=vendas.filter(v=>v.status==='cancelado' && dentroDoPeriodo(v.dataISO,rangeVKpi));
   const totalVendido=vendasAtivas.reduce((a,v)=>a+v.total,0);
-  const totalRecebido=vendasAtivas.filter(v=>v.pgtoRecebido==='sim').reduce((a,v)=>a+v.total,0);
-  const totalPendente=totalVendido-totalRecebido;
+  // "Recebido" usa a data em que o pagamento foi marcado como recebido, nao a data da venda.
+  const totalRecebido=vendasAtivasTodasVK.filter(v=>v.pgtoRecebido==='sim' && dentroDoPeriodo(v.dataRecebimento||v.dataISO,rangeVKpi)).reduce((a,v)=>a+v.total,0);
+  const totalPendente=vendasAtivas.filter(v=>v.pgtoRecebido!=='sim').reduce((a,v)=>a+v.total,0);
   const totalCancelado=vendasCanceladas.reduce((a,v)=>a+v.total,0);
   const pendentes=vendasAtivas.filter(v=>v.status==='pendente').length;
   const entregues=vendasAtivas.filter(v=>v.status==='entregue').length;
@@ -3022,6 +3033,10 @@ async function salvarVenda(){
   }
   const valorLiquido=(valor1-taxaValor)+(valor2-taxaValor2);
   const status=document.getElementById('v-status').value;
+  const vendaAnterior = editandoVenda ? vendas.find(v=>v.id===editandoVenda) : null;
+  const isNova = !editandoVenda;
+  const pgtoRecebidoNovo=document.getElementById('v-pgto-recebido').value;
+  const dataRecebimento = pgtoRecebidoNovo==='sim' ? (vendaAnterior?.pgtoRecebido==='sim' ? (vendaAnterior.dataRecebimento||new Date().toISOString().slice(0,10)) : new Date().toISOString().slice(0,10)) : null;
   const obj={
     cliente, tel:document.getElementById('v-tel').value, cpf:document.getElementById('v-cpf').value,
     endRua, endNum, endCidade, endEstado,
@@ -3030,13 +3045,11 @@ async function salvarVenda(){
     total, pgto, bandeira:usaMaq?bandeira:'', parcelas:usaMaq?parcelas:'',
     taxaPct:usaMaq?taxaPct:0, taxaValor:usaMaq?taxaValor:0, valorLiquido,
     pgto2:(dividirPgto&&valor2>0)?pgto2:'', bandeira2, parcelas2, taxaPct2, taxaValor2, valor2:(dividirPgto?valor2:0),
-    pgtoRecebido:document.getElementById('v-pgto-recebido').value,
+    pgtoRecebido:pgtoRecebidoNovo, dataRecebimento,
     vendedoraId, perfilVendedoraId: vendSel?.perfil_id||null,
     status, dataISO, previsaoISO,
     obs:document.getElementById('v-obs').value
   };
-  const vendaAnterior = editandoVenda ? vendas.find(v=>v.id===editandoVenda) : null;
-  const isNova = !editandoVenda;
   const row=vendaToRow(obj);
   const btn=document.getElementById('btn-salvar-venda'); btn.disabled=true;
   let vendaId;
@@ -3076,10 +3089,12 @@ async function salvarVenda(){
   fecharModal('venda'); renderVendas(); renderProd(); renderDash(); renderEntregas(); renderCalendario();
 }
 async function mudarPgtoRecebido(id,valor){
-  const {error}=await sb.from('vendas').update({pgto_recebido:valor}).eq('id',id);
+  const v=vendas.find(x=>x.id===id);
+  const dataRecebimento = valor==='sim' ? (v?.dataRecebimento || new Date().toISOString().slice(0,10)) : null;
+  const {error}=await sb.from('vendas').update({pgto_recebido:valor, data_recebimento:dataRecebimento}).eq('id',id);
   if(error){ alert('Erro: '+error.message); return; }
-  vendas=vendas.map(v=>v.id===id?{...v,pgtoRecebido:valor}:v);
-  renderVendas();
+  vendas=vendas.map(x=>x.id===id?{...x,pgtoRecebido:valor,dataRecebimento:dataRecebimento||''}:x);
+  renderVendas(); renderDash();
 }
 async function mudarStatusVenda(id,status){
   const v=vendas.find(x=>x.id===id); if(!v) return;
