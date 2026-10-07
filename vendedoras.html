@@ -97,6 +97,7 @@
   <main>
     <!-- INÍCIO -->
     <div id="ab-i" class="ab at">
+      <div class="fi" style="margin-bottom:10px"><label>Comissão do mês</label><select id="com-mes" onchange="cD()"></select></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px" id="kg"></div>
       <div class="ca">
         <b style="display:block;margin-bottom:10px">Ações Rápidas</b>
@@ -540,14 +541,26 @@ async function cD(){
   const dm=ativas.filter(v=>{ const d=new Date(v.criado_em); return d.getMonth()===mes && d.getFullYear()===ano; });
   const entregues=ativas.filter(v=>v.status==='entregue');
   const aguardando=ativas.filter(v=>v.status!=='entregue');
-  const recebido=ativas.filter(v=>v.pgto_recebido==='sim').reduce((a,v)=>a+Number(v.total||0),0);
+  const selMes=document.getElementById('com-mes');
+  if(!selMes.options.length){
+    const hoje=new Date();
+    for(let i=0;i<12;i++){
+      const d=new Date(hoje.getFullYear(),hoje.getMonth()-i,1);
+      const val=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+      const lbl=d.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+      selMes.add(new Option(i===0?lbl+' (atual)':lbl,val));
+    }
+  }
+  const mesSel=selMes.value;
+  const recebidosMes=ativas.filter(v=>v.pgto_recebido==='sim' && String(v.data_recebimento||v.data_venda||v.criado_em||'').slice(0,7)===mesSel);
+  const recebido=recebidosMes.reduce((a,v)=>a+Number(v.total||0),0);
   const comissaoValor=recebido*(vcomissao/100);
   document.getElementById('kg').innerHTML=[
     {l:'Vendas Mês',v:dm.length,s:fR(dm.reduce((a,v)=>a+Number(v.total||0),0)),c:'#2E6BC4'},
     {l:'Total Geral',v:ativas.length,s:fR(tot),c:'#1A7A4A'},
     {l:'Entregues',v:entregues.length,s:'de '+ativas.length+' vendas',c:'#1A7A4A'},
     {l:'Aguardando Entrega',v:aguardando.length,s:'ainda não entregues',c:'#B45309'},
-    {l:'Comissão a Receber',v:fR(comissaoValor),s:vcomissao+'% sobre '+fR(recebido)+' recebidos',c:'#1E4D8C'}
+    {l:'Comissão do Mês',v:fR(comissaoValor),s:vcomissao+'% sobre '+fR(recebido)+' recebidos no mês selecionado',c:'#1E4D8C'}
   ].map(k=>`<div style="background:#fff;border-radius:12px;border:1.5px solid var(--borda);padding:14px;border-left:4px solid ${k.c}"><div style="font-size:10px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">${k.l}</div><div style="font-size:20px;font-weight:800">${k.v}</div><div style="font-size:11px;color:var(--sub);margin-top:3px">${k.s}</div></div>`).join('');
   document.getElementById('uv').innerHTML=l.slice(0,5).map(v=>`<div class="vi"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><div><b>${v.cliente}</b><div style="font-size:11px;color:var(--sub)">${new Date(v.data_venda||v.criado_em).toLocaleDateString('pt-BR')}</div></div><b style="color:var(--verde)">${fR(v.total)}</b></div><span class="badge" style="background:${CL[v.status]||'#DBEAFE'}">${LB[v.status]||v.status}</span></div>`).join('')||'<div style="text-align:center;color:var(--sub);padding:20px">Nenhuma venda</div>';
 }
