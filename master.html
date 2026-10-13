@@ -2869,6 +2869,14 @@ async function transformarOrcamentoEmPedidoMaster(id){
   const o=orcamentos.find(x=>x.id===id);
   if(!o) return alert('Orçamento não encontrado.');
   if(!confirm('Transformar este orçamento em pedido? Isso vai criar uma venda com os mesmos dados.')) return;
+  const txtData=prompt('Data de entrega (dd/mm/aaaa).\nDeixe em branco se ainda não está definida:','');
+  if(txtData===null) return;
+  let previsaoISO=null;
+  if(txtData.trim()){
+    const m=txtData.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if(!m) return alert('Data inválida. Use o formato dd/mm/aaaa, por exemplo 17/10/2026.');
+    previsaoISO=m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+  }
   const row={
     cliente:o.cliente, tel:o.tel||'', cpf:o.cpf||'',
     end_rua:o.end_rua||'', end_num:o.end_num||'', end_cidade:o.end_cidade||'', end_estado:o.end_estado||'',
@@ -2878,16 +2886,24 @@ async function transformarOrcamentoEmPedidoMaster(id){
     valor_liquido:(o.total-(o.taxa_valor||0)-(o.taxa_valor2||0)),
     pgto2:o.pgto2||'', bandeira2:o.bandeira2||'', parcelas2:o.parcelas2||'', taxa_pct2:o.taxa_pct2||0, taxa_valor2:o.taxa_valor2||0, valor2:o.valor2||0,
     pgto_recebido:'nao', vendedora_id:o.vendedora_id||null, perfil_vendedora_id:o.perfil_vendedora_id||null,
-    status:'pendente', previsao_iso:null, obs:o.obs||'',
+    status:'pendente', previsao_iso:previsaoISO, obs:o.obs||'',
     data_venda:new Date().toISOString().slice(0,10)
   };
   const {data,error}=await sb.from('vendas').insert(row).select().single();
   if(error){ alert('Erro ao criar o pedido: '+error.message); return; }
+  await ajustarEstoqueVenda(o.itens||[],-1);
+  if(previsaoISO){
+    const endCompleto=[row.end_rua,row.end_num,row.end_cidade,row.end_estado].filter(Boolean).join(', ');
+    const entObj={ cliente:row.cliente, end:endCompleto, itens:(o.itens||[]).map(i=>i.qtd+'x '+i.nome).join(', '), entregadorId:null, dataISO:previsaoISO, periodo:'Manhã', status:'agendado', obs:row.obs, vendaId:data.id };
+    const {data:entD,error:errEnt}=await sb.from('entregas').insert(entregaToRow(entObj)).select().single();
+    if(errEnt) alert('O pedido foi criado, mas NÃO consegui criar a entrega no calendário: '+errEnt.message);
+    else entregas.push(entregaFromRow(entD));
+  }
   const {error:errUpd}=await sb.from('orcamentos').update({status:'convertido', venda_id:data.id}).eq('id',id);
   if(errUpd) alert('Pedido criado, mas não consegui marcar o orçamento como convertido: '+errUpd.message);
   vendas=[vendaFromRow(data), ...vendas];
   orcamentos=orcamentos.map(x=>x.id===id?{...x,status:'convertido',venda_id:data.id}:x);
-  renderOrcamentos(); renderVendas(); renderDash();
+  renderOrcamentos(); renderVendas(); renderProd(); renderDash(); renderEntregas(); renderCalendario();
   alert('Pedido #'+data.id+' criado com sucesso!');
 }
 function abrirModalVenda(){
@@ -3063,24 +3079,21 @@ async function salvarVenda(){
   if(isNova && status!=='cancelado'){
     await ajustarEstoqueVenda(itensFiltrados,-1);
   }
-  if(previsaoISO && isNova){
-    const jaExiste = entregas.some(e=>e.vendaId==vendaId);
-    if(!jaExiste){
-      const endCompleto=[endRua,endNum,endCidade,endEstado].filter(Boolean).join(', ');
-      const entObj={ cliente, end:endCompleto, itens:itensFiltrados.map(i=>i.qtd+'x '+i.nome).join(', '), entregadorId:null, dataISO:previsaoISO, periodo:'Manhã', status:'agendado', obs:obj.obs, vendaId };
-      const {data,error}=await sb.from('entregas').insert(entregaToRow(entObj)).select().single();
-      if(!error) entregas.push(entregaFromRow(data));
-    }
-  }
-  if(!isNova){
-    const entregaLigada = entregas.find(e=>e.vendaId==editandoVenda);
+  {
+    const endCompleto=[endRua,endNum,endCidade,endEstado].filter(Boolean).join(', ');
+    const itensTxt = itensFiltrados.map(i=>i.qtd+'x '+i.nome).join(', ');
+    const entregaLigada = entregas.find(e=>e.vendaId==vendaId && e.tipo!=='posvenda');
     if(entregaLigada){
-      const endCompleto=[endRua,endNum,endCidade,endEstado].filter(Boolean).join(', ');
-      const itensTxt = itensFiltrados.map(i=>i.qtd+'x '+i.nome).join(', ');
       const syncPatch = { cliente, end_completo:endCompleto, itens:itensTxt };
       if(previsaoISO) syncPatch.data_entrega = previsaoISO;
       const {error:errSync} = await sb.from('entregas').update(syncPatch).eq('id',entregaLigada.id);
       if(!errSync) entregas = entregas.map(e=>e.id===entregaLigada.id?{...e,cliente,end:endCompleto,itens:itensTxt,dataISO:previsaoISO||e.dataISO,data:previsaoISO?fmtDataBR(previsaoISO):e.data}:e);
+    } else if(previsaoISO){
+      // venda nova OU venda antiga que ainda nao tinha entrega e ganhou uma data agora: cria a entrega
+      const entObj={ cliente, end:endCompleto, itens:itensTxt, entregadorId:null, dataISO:previsaoISO, periodo:'Manhã', status:'agendado', obs:obj.obs, vendaId };
+      const {data,error}=await sb.from('entregas').insert(entregaToRow(entObj)).select().single();
+      if(error) alert('A venda foi salva, mas NÃO consegui criar a entrega no calendário: '+error.message+'\nAbra a venda de novo e salve para tentar outra vez.');
+      else entregas.push(entregaFromRow(data));
     }
   }
   btn.disabled=false;
