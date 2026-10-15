@@ -4114,5 +4114,26 @@ async function iniciarApp(){
   if(romaneioInput) romaneioInput.addEventListener('change', atualizarPreviewRomaneio);
 })();
 </script>
+<script>
+// Barra de rolagem horizontal tambem no TOPO das tabelas largas (sincronizada com a de baixo)
+function criarScrollTopo(wrap){
+  if(wrap.dataset.scrollTopo) return; wrap.dataset.scrollTopo='1';
+  const topo=document.createElement('div');
+  topo.style.cssText='overflow-x:auto;overflow-y:hidden;height:16px;margin-bottom:4px;display:none';
+  const inner=document.createElement('div'); inner.style.height='1px'; topo.appendChild(inner);
+  wrap.parentNode.insertBefore(topo,wrap);
+  topo.addEventListener('scroll',()=>{ if(wrap.scrollLeft!==topo.scrollLeft) wrap.scrollLeft=topo.scrollLeft; });
+  wrap.addEventListener('scroll',()=>{ if(topo.scrollLeft!==wrap.scrollLeft) topo.scrollLeft=wrap.scrollLeft; });
+  const tabela=wrap.querySelector('table');
+  const atualizar=()=>{
+    const larg=tabela?tabela.scrollWidth:wrap.scrollWidth;
+    inner.style.width=larg+'px';
+    topo.style.display=larg>wrap.clientWidth+1?'block':'none';
+  };
+  const ro=new ResizeObserver(atualizar); ro.observe(wrap); if(tabela) ro.observe(tabela);
+  atualizar();
+}
+document.querySelectorAll('.tbl-wrap').forEach(criarScrollTopo);
+</script>
 </body>
 </html>
