@@ -1139,7 +1139,10 @@
           <div id="sug-pv-venda" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--borda);border-radius:8px;margin-top:2px;max-height:220px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div>
         </div>
       </div>
-      <div class="field"><label>Cliente</label><input id="pv-cliente" placeholder="Nome do cliente"></div>
+      <div class="grid2">
+        <div class="field"><label>Cliente</label><input id="pv-cliente" placeholder="Nome do cliente"></div>
+        <div class="field"><label>Telefone</label><input id="pv-tel" placeholder="(00) 00000-0000"></div>
+      </div>
       <div class="grid2">
         <div class="field"><label>Produto</label>
           <div style="position:relative">
@@ -2339,6 +2342,7 @@ function preencherPosVendaDaVenda(){
   if(!vid) return;
   const v=vendas.find(x=>x.id==vid); if(!v) return;
   document.getElementById('pv-cliente').value=v.cliente;
+  if(v.tel) document.getElementById('pv-tel').value=v.tel;
   if(v.end) document.getElementById('pv-endereco').value=v.end;
   if(v.vendedoraId) document.getElementById('pv-vendedora').value=v.vendedoraId;
   if((v.itens||[]).length===1){
@@ -2355,7 +2359,7 @@ function abrirModalPosVenda(){
   editandoPosVenda=null;
   document.getElementById('modal-posvenda-titulo').textContent='Novo Registro de Pós-venda';
   popularSelectsPosVenda();
-  ['pv-cliente','pv-endereco','pv-produto-nome','pv-tipo','pv-prazo','pv-custo','pv-obs'].forEach(id=>document.getElementById(id).value='');
+  ['pv-cliente','pv-tel','pv-endereco','pv-produto-nome','pv-tipo','pv-prazo','pv-custo','pv-obs'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('pv-venda').value='';
   document.getElementById('pv-venda-busca').value='';
   document.getElementById('pv-produto').value='';
@@ -2373,6 +2377,7 @@ function editarPosVenda(id){
   const vOrig=p.venda_id?vendas.find(v=>v.id==p.venda_id):null;
   document.getElementById('pv-venda-busca').value=vOrig?`#${vOrig.id} – ${vOrig.cliente} (${vOrig.data})`:'';
   document.getElementById('pv-cliente').value=p.cliente||'';
+  document.getElementById('pv-tel').value=p.tel||'';
   document.getElementById('pv-endereco').value=p.endereco||'';
   document.getElementById('pv-produto').value=p.produto_id||'';
   const prodOrig=p.produto_id?produtos.find(x=>x.id==p.produto_id):null;
@@ -2395,7 +2400,7 @@ async function salvarPosVenda(){
   const vendedoraId=document.getElementById('pv-vendedora').value||null;
   const vendSel=vendedoraId?vendedoras.find(x=>x.id==vendedoraId):null;
   const obj={
-    venda_id: vendaId, cliente, endereco: document.getElementById('pv-endereco').value,
+    venda_id: vendaId, cliente, tel: document.getElementById('pv-tel').value, endereco: document.getElementById('pv-endereco').value,
     produto_id: produtoId, produto_nome: document.getElementById('pv-produto-nome').value.trim(),
     tipo_conserto: tipoConserto, prazo: document.getElementById('pv-prazo').value||null,
     custo: Number(document.getElementById('pv-custo').value)||0,
@@ -2488,6 +2493,7 @@ async function gerarPosVendaPDFMaster(pv){
   doc.text('Cliente: '+pv.cliente, 14, 46);
   doc.setFont('helvetica','normal'); doc.setTextColor(90,106,138);
   let y=52;
+  if(pv.tel){ doc.text('Telefone: '+pv.tel, 14, y); y+=6; }
   if(pv.endereco){ doc.text('Endereço: '+pv.endereco, 14, y); y+=6; }
   if(pv.produto_nome){ doc.text('Produto: '+pv.produto_nome, 14, y); y+=6; }
   doc.text('Serviço: '+pv.tipo_conserto, 14, y); y+=6;
@@ -3079,6 +3085,7 @@ async function salvarVenda(){
   if(isNova && status!=='cancelado'){
     await ajustarEstoqueVenda(itensFiltrados,-1);
   }
+  if(!isNova && vendaAnterior && vendaAnterior.status!==status) await sincronizarEntregaComStatusVenda(vendaId,status);
   {
     const endCompleto=[endRua,endNum,endCidade,endEstado].filter(Boolean).join(', ');
     const itensTxt = itensFiltrados.map(i=>i.qtd+'x '+i.nome).join(', ');
@@ -3107,6 +3114,19 @@ async function mudarPgtoRecebido(id,valor){
   vendas=vendas.map(x=>x.id===id?{...x,pgtoRecebido:valor,dataRecebimento:dataRecebimento||''}:x);
   renderVendas(); renderDash();
 }
+// Venda cancelada -> entrega vinculada vira "cancelado" (some das entregas/romaneio/calendario).
+// Venda reativada -> entrega volta (entregue se a venda esta entregue, senao agendado).
+async function sincronizarEntregaComStatusVenda(vendaId, statusVenda){
+  const ligadas=entregas.filter(e=>e.vendaId==vendaId && e.tipo!=='posvenda');
+  for(const e of ligadas){
+    let novo=null;
+    if(statusVenda==='cancelado' && e.status!=='cancelado') novo='cancelado';
+    else if(statusVenda!=='cancelado' && e.status==='cancelado') novo = statusVenda==='entregue' ? 'entregue' : 'agendado';
+    if(!novo) continue;
+    const {error}=await sb.from('entregas').update({status:novo}).eq('id',e.id);
+    if(!error) entregas=entregas.map(x=>x.id===e.id?{...x,status:novo}:x);
+  }
+}
 async function mudarStatusVenda(id,status){
   const v=vendas.find(x=>x.id===id); if(!v) return;
   const anterior=v.status;
@@ -3119,6 +3139,7 @@ async function mudarStatusVenda(id,status){
   const {error}=await sb.from('vendas').update({status}).eq('id',id);
   if(error){ alert('Erro: '+error.message); return; }
   vendas=vendas.map(x=>x.id===id?{...x,status}:x);
+  await sincronizarEntregaComStatusVenda(id,status);
   if(status==='entregue'){
     const entLigada=entregas.find(e=>e.vendaId===id);
     if(entLigada && entLigada.status!=='entregue'){
@@ -3161,9 +3182,10 @@ function agendarEntregaDaVenda(vid){
 // ─── ENTREGAS ─────────────────────────────────────────────────────────────────
 function renderMetricasEntregas(){
   const el=document.getElementById('kpi-entregas'); if(!el) return;
-  const totalEnt=entregas.length;
-  const entregues=entregas.filter(e=>e.status==='entregue');
-  const reagendadas=entregas.filter(e=>e.status==='reagendado');
+  const entregasVis=entregas.filter(entregaVisivel);
+  const totalEnt=entregasVis.length;
+  const entregues=entregasVis.filter(e=>e.status==='entregue');
+  const reagendadas=entregasVis.filter(e=>e.status==='reagendado');
   const comDataReal=entregues.filter(e=>e.entregueEm);
   const atrasadas=comDataReal.filter(e=>e.entregueEm>e.dataISO);
   const pctEntregue = totalEnt ? Math.round(entregues.length/totalEnt*100) : 0;
@@ -3177,6 +3199,18 @@ function renderMetricasEntregas(){
     {l:'% Atraso',v:pctAtraso+'%',s:comDataReal.length?atrasadas.length+' de '+comDataReal.length+' entregues':'sem dados ainda',cor:pctAtraso>0?'#B91C1C':'#22A05B'},
     {l:'% Reagendado',v:pctReagendado+'%',s:motivosTxt,cor:'#B45309'},
   ].map(k=>`<div class="kpi" style="border-left:5px solid ${k.cor}"><div class="kpi-label">${k.l}</div><div class="kpi-valor">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');
+}
+// Entrega de venda cancelada nao aparece em lugar nenhum (lista, calendario, metricas, romaneio)
+function entregaVisivel(e){
+  if(e.status==='cancelado') return false;
+  if(e.vendaId){ const v=vendas.find(x=>x.id==e.vendaId); if(v && v.status==='cancelado') return false; }
+  return true;
+}
+// Telefone do cliente: vem da venda vinculada ou do pos-venda vinculado
+function telDaEntrega(e){
+  if(e.vendaId){ const v=vendas.find(x=>x.id==e.vendaId); if(v && v.tel) return v.tel; }
+  if(e.posVendaId){ const p=posVendas.find(x=>x.id==e.posVendaId); if(p && p.tel) return p.tel; }
+  return '';
 }
 const LBL_STATUS_ENTREGA={agendado:'Agendado',em_rota:'Em Rota',entregue:'Entregue',reagendado:'Reagendado'};
 function trEntrega(e){
@@ -3207,6 +3241,7 @@ function renderEntregas(){
   const filtroEnt=document.getElementById('filtro-entrega-entregador')?.value||'todos';
   const filtroVend=document.getElementById('filtro-entrega-vendedora')?.value||'todas';
   const lista=entregas.filter(e=>{
+    if(!entregaVisivel(e)) return false;
     const mb=e.cliente.toLowerCase().includes(busca)||(e.end||'').toLowerCase().includes(busca);
     const ms=filtroSt==='todos'||e.status===filtroSt;
     const me=filtroEnt==='todos'||String(e.entregadorId)===filtroEnt;
@@ -3255,7 +3290,7 @@ function renderCalendario(){
     const dia=new Date(inicioSemana); dia.setDate(inicioSemana.getDate()+d);
     const diaISO=dia.toISOString().slice(0,10);
     const isHoje=dia.getTime()===hoje2.getTime();
-    const entsDia=entregas.filter(e=>e.dataISO===diaISO);
+    const entsDia=entregas.filter(e=>e.dataISO===diaISO && entregaVisivel(e));
     const corBg=isHoje?'#EFF6FF':entsDia.length>0?'#F0FDF4':'#fff';
     const corBorda=isHoje?'var(--azul)':entsDia.length>0?'var(--verde)':'var(--borda)';
     html+=`<div style="background:${corBg};border:2px solid ${corBorda};border-radius:10px;padding:8px;min-height:90px;cursor:pointer" onclick="filtrarDia('${diaISO}')">
@@ -3279,7 +3314,7 @@ function irHoje(){ semanaOffset=0; renderCalendario(); }
 function filtrarDia(diaISO){
   const busca=document.getElementById('busca-entrega'); if(busca) busca.value='';
   const tbody=document.getElementById('tbody-entregas');
-  const lista=entregas.filter(e=>e.dataISO===diaISO).sort((a,b)=>a.periodo>b.periodo?1:-1);
+  const lista=entregas.filter(e=>e.dataISO===diaISO && entregaVisivel(e)).sort((a,b)=>a.periodo>b.periodo?1:-1);
   if(!lista.length){ tbody.innerHTML=`<tr><td colspan="12" class="sem-dados">Nenhuma entrega para este dia.</td></tr>`; return; }
   tbody.innerHTML=lista.map(trEntrega).join('');
 }
@@ -3388,7 +3423,7 @@ function abrirModalRomaneio(){
 function atualizarPreviewRomaneio(){
   const data=document.getElementById('romaneio-data').value;
   if(!data){ document.getElementById('romaneio-preview').textContent=''; return; }
-  const entsDia=entregas.filter(e=>e.dataISO===data);
+  const entsDia=entregas.filter(e=>e.dataISO===data && entregaVisivel(e));
   const el=document.getElementById('romaneio-preview');
   if(!entsDia.length){ el.innerHTML='<span style="color:var(--vm)">Nenhuma entrega nesta data.</span>'; return; }
   const grupos={};
@@ -3402,7 +3437,7 @@ function atualizarPreviewRomaneio(){
 function gerarRomaneio(){
   const dataISO=document.getElementById('romaneio-data').value;
   if(!dataISO){ alert('Selecione uma data.'); return; }
-  const entsDia=entregas.filter(e=>e.dataISO===dataISO).sort((a,b)=>a.periodo>b.periodo?1:-1);
+  const entsDia=entregas.filter(e=>e.dataISO===dataISO && entregaVisivel(e)).sort((a,b)=>a.periodo>b.periodo?1:-1);
   if(!entsDia.length){ alert('Nenhuma entrega nesta data.'); return; }
   const dataFmt=new Date(dataISO+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
   const grupos={};
@@ -3430,7 +3465,7 @@ function gerarRomaneio(){
     const linhas=lista.map((e,i)=>{
       const venda=e.vendaId?vendas.find(v=>v.id==e.vendaId):null;
       return `<tr><td class="num">${i+1}</td><td>${e.periodo}</td>
-        <td><b>${e.cliente}</b>${e.end?`<br><span style="font-size:11px;color:#5A6A8A">${e.end}</span>`:''}</td>
+        <td><b>${e.cliente}</b>${telDaEntrega(e)?`<br><span style="font-size:12px;font-weight:700">Tel: ${telDaEntrega(e)}</span>`:''}${e.end?`<br><span style="font-size:11px;color:#5A6A8A">${e.end}</span>`:''}</td>
         <td style="font-size:12px">${e.itens||'—'}</td>
         <td>${venda?`<b style="color:#1A7A4A">R$ ${Number(venda.total).toLocaleString('pt-BR',{minimumFractionDigits:2})}</b><br><span style="font-size:11px;color:#5A6A8A">${venda.pgto}</span>`:'—'}</td>
         <td><span class="status-badge ${clsSt[e.status]||'badge-ag'}">${lblSt[e.status]||e.status}</span></td>
@@ -3491,6 +3526,7 @@ function imprimirEntrega(id){
     <div class="box">
       <b class="tit">Cliente / Entrega</b>
       <div><b>${e.cliente}</b></div>
+      ${telDaEntrega(e)?`<div style="font-size:12.5px;margin-top:2px">Telefone: <b>${telDaEntrega(e)}</b></div>`:''}
       <div style="color:#5A6A8A;font-size:12.5px;margin-top:2px">${e.end||'Endereço não informado'}</div>
       <div style="margin-top:8px;font-size:12.5px">Data agendada: <b>${e.data}</b> &nbsp;·&nbsp; Período: <b>${e.periodo}</b> &nbsp;·&nbsp; Status: <b>${lblSt[e.status]||e.status}</b></div>
       ${ent?`<div style="margin-top:4px;font-size:12.5px">Entregador: <b>${ent.nome}</b>${ent.veiculo?' · '+ent.veiculo:''}${ent.placa?' · '+ent.placa:''}</div>`:''}
