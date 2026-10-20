@@ -617,7 +617,19 @@ async function cD(){
   const ativas=l.filter(v=>v.status!=='cancelado');
   const mes=new Date().getMonth(), ano=new Date().getFullYear();
   const dm=ativas.filter(v=>{ const d=new Date(v.criado_em); return d.getMonth()===mes && d.getFullYear()===ano; });
-  const entregues=ativas.filter(v=>v.status==='entregue');
+  // Entregues SO do mes atual: usa a data real da entrega (entregue_em); sem ela, a previsao ou a data da venda
+  const entreguesAll=ativas.filter(v=>v.status==='entregue');
+  let entreguesMes=0;
+  if(entreguesAll.length){
+    const {data:es}=await sb.from('entregas').select('venda_id,entregue_em,data_entrega').in('venda_id',entreguesAll.map(v=>v.id));
+    const porVenda={}; (es||[]).forEach(e=>{ porVenda[e.venda_id]=e; });
+    const mesAtual=hojeISO().slice(0,7);
+    entreguesMes=entreguesAll.filter(v=>{
+      const e=porVenda[v.id];
+      const d=(e&&(e.entregue_em||e.data_entrega))||v.previsao_iso||v.data_venda||'';
+      return String(d).slice(0,7)===mesAtual;
+    }).length;
+  }
   const aguardando=ativas.filter(v=>v.status!=='entregue');
   renderMeta(ativas);
   renderCampanhasVend().catch(()=>{});
@@ -637,7 +649,7 @@ async function cD(){
   const comissaoValor=recebido*(vcomissao/100);
   document.getElementById('kg').innerHTML=[
     {l:'Vendas Mês',v:dm.length,s:fR(dm.reduce((a,v)=>a+Number(v.total||0),0)),c:'#2E6BC4'},
-    {l:'Entregues',v:entregues.length,s:'de '+ativas.length+' vendas',c:'#1A7A4A'},
+    {l:'Entregues no Mês',v:entreguesMes,s:'vendas entregues neste mês',c:'#1A7A4A'},
     {l:'Aguardando Entrega',v:aguardando.length,s:'ainda não entregues',c:'#B45309'},
     {l:'Comissão do Mês',v:fR(comissaoValor),s:vcomissao+'% sobre '+fR(recebido)+' recebidos no mês selecionado',c:'#1E4D8C'}
   ].map(k=>`<div style="background:#fff;border-radius:12px;border:1.5px solid var(--borda);padding:14px;border-left:4px solid ${k.c}"><div style="font-size:10px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">${k.l}</div><div style="font-size:20px;font-weight:800">${k.v}</div><div style="font-size:11px;color:var(--sub);margin-top:3px">${k.s}</div></div>`).join('');
