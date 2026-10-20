@@ -1194,12 +1194,16 @@
           <div class="field"><label>Comissão (%)</label><input id="nv-comissao" type="number" min="0" max="100" step="0.5" placeholder="Ex: 5"></div>
           <div class="field"><label>E-mail (opcional)</label><input id="nv-email" placeholder="email@exemplo.com"></div>
         </div>
+        <div class="field"><label>Meta mensal de vendas (R$)</label><input id="nv-meta" type="number" min="0" step="100" placeholder="Ex: 30000"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
           <button class="btn btn-ghost btn-sm" onclick="limparFormVendedora()">Limpar</button>
           <button class="btn btn-success btn-sm" onclick="salvarVendedora()">Salvar Vendedora</button>
         </div>
       </div>
-      <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:var(--sub)">Vendedoras Cadastradas</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap">
+        <div style="font-weight:700;font-size:13px;color:var(--sub)">Vendedoras Cadastradas</div>
+        <button class="btn btn-sm btn-ghost" onclick="definirMetaParaTodas()">Definir meta mensal para todas</button>
+      </div>
       <div id="lista-vendedoras-modal"></div>
       <div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn btn-primary" onclick="fecharModal('vendedoras')">Fechar</button></div>
     </div>
@@ -2126,11 +2130,11 @@ async function salvarMov(){
 
 // ─── VENDEDORAS ───────────────────────────────────────────────────────────────
 function abrirModalVendedoras(){ editandoVendedora=null; limparFormVendedora(); renderListaVendedorasModal(); popularSelectVendedoras(); document.getElementById('modal-vendedoras').classList.add('open'); }
-function limparFormVendedora(){ ['nv-nome','nv-tel','nv-comissao','nv-email'].forEach(id=>document.getElementById(id).value=''); editandoVendedora=null; }
+function limparFormVendedora(){ ['nv-nome','nv-tel','nv-comissao','nv-email','nv-meta'].forEach(id=>document.getElementById(id).value=''); editandoVendedora=null; }
 async function salvarVendedora(){
   const nome=document.getElementById('nv-nome').value.trim();
   if(!nome){ alert('Informe o nome da vendedora.'); return; }
-  const obj={nome,tel:document.getElementById('nv-tel').value,comissao:Number(document.getElementById('nv-comissao').value)||0,email:document.getElementById('nv-email').value};
+  const obj={nome,tel:document.getElementById('nv-tel').value,comissao:Number(document.getElementById('nv-comissao').value)||0,email:document.getElementById('nv-email').value,meta_mensal:Number(document.getElementById('nv-meta').value)||0};
   if(editandoVendedora){
     const {data,error}=await sb.from('vendedoras').update(obj).eq('id',editandoVendedora).select().single();
     if(error){ alert('Erro: '+error.message); return; }
@@ -2148,6 +2152,7 @@ function editarVendedoraModal(id){
   document.getElementById('nv-nome').value=v.nome;
   document.getElementById('nv-tel').value=v.tel||'';
   document.getElementById('nv-comissao').value=v.comissao||'';
+  document.getElementById('nv-meta').value=v.meta_mensal||'';
   document.getElementById('nv-email').value=v.email||'';
 }
 async function excluirVendedoraModal(id){
@@ -2163,7 +2168,7 @@ function renderListaVendedorasModal(){
   el.innerHTML=vendedoras.slice().sort((a,b)=>(vendedoraAtiva(b)-vendedoraAtiva(a))||a.nome.localeCompare(b.nome)).map(v=>`
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:${vendedoraAtiva(v)?'#fff':'#F3F4F6'};border:1.5px solid var(--borda);border-radius:8px;margin-bottom:8px;gap:10px;flex-wrap:wrap;${vendedoraAtiva(v)?'':'opacity:.75'}">
       <div><div style="font-weight:700">${v.nome}${vendedoraAtiva(v)?'':' <span class="badge badge-cinza">Inativa</span>'}</div>
-      <div style="font-size:12px;color:var(--sub)">${v.tel||''}${v.email?' · '+v.email:''} · Comissão: <b>${v.comissao}%</b></div></div>
+      <div style="font-size:12px;color:var(--sub)">${v.tel||''}${v.email?' · '+v.email:''} · Comissão: <b>${v.comissao}%</b>${v.meta_mensal>0?' · Meta: <b>'+fmtR(v.meta_mensal)+'</b>':''}</div></div>
       <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
         ${v.perfil_id?`<span class="badge badge-verde">Login ativo</span><button class="btn btn-sm btn-ghost" onclick="alterarAcessoVendedora(${v.id})">Alterar acesso</button>`:`<button class="btn btn-sm" style="background:#DBEAFE;color:#1E40AF;border:1px solid #93C5FD" onclick="criarAcessoVendedora(${v.id})">Criar acesso</button>`}
         <button class="btn btn-sm btn-ghost" onclick="editarVendedoraModal(${v.id})">Editar</button>
@@ -2171,6 +2176,20 @@ function renderListaVendedorasModal(){
         <button class="btn btn-sm" style="background:none;border:1.5px solid var(--borda)" onclick="excluirVendedoraModal(${v.id})">Excluir</button>
       </div>
     </div>`).join('');
+}
+async function definirMetaParaTodas(){
+  const ativas=vendedoras.filter(vendedoraAtiva);
+  if(!ativas.length){ alert('Nenhuma vendedora ativa.'); return; }
+  const txt=prompt(`Meta mensal de vendas (R$) para as ${ativas.length} vendedoras ativas.\nIsso substitui a meta atual de cada uma:`,'');
+  if(txt===null) return;
+  const meta=Number(String(txt).replace(/\./g,'').replace(',','.'));
+  if(!(meta>=0)){ alert('Valor inválido.'); return; }
+  const {data,error}=await sb.from('vendedoras').update({meta_mensal:meta}).in('id',ativas.map(v=>v.id)).select('id');
+  if(error){ alert('Erro: '+error.message); return; }
+  const ids=new Set((data||[]).map(x=>x.id));
+  vendedoras=vendedoras.map(v=>ids.has(v.id)?{...v,meta_mensal:meta}:v);
+  renderListaVendedorasModal();
+  alert(`Meta de ${fmtR(meta)} definida para ${ids.size} vendedora(s).`);
 }
 function vendedoraAtiva(v){ return v.ativo!==false ? 1 : 0; }
 async function alternarAtivoVendedora(id){
