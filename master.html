@@ -900,6 +900,21 @@
   </div>
 </div>
 
+<!-- MODAL DATA DA ENTREGA REALIZADA -->
+<div class="overlay" id="modal-data-entrega">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header"><h2>Data da entrega</h2><button onclick="cancelarDataEntrega()">&times;</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Em que dia a entrega foi realizada?</label><input id="de-data" type="date"></div>
+      <div style="font-size:12px;color:var(--sub)">Já vem preenchido com a data agendada. Se foi entregue em outro dia, mude aqui — isso evita contar como atraso uma entrega feita no prazo e registrada depois.</div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+        <button class="btn btn-ghost" onclick="cancelarDataEntrega()">Cancelar</button>
+        <button class="btn btn-success" onclick="confirmarDataEntrega()">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL CAMPANHA -->
 <div class="overlay" id="modal-campanha">
   <div class="modal">
@@ -1174,6 +1189,11 @@
           <option value="Produção">Produção</option>
           <option value="Fora de rota">Fora de rota</option>
         </select>
+      </div>
+      <div class="field" id="wrap-entregue-em" style="display:none">
+        <label>Data em que foi entregue</label>
+        <input id="e-entregue-em" type="date">
+        <div style="font-size:11.5px;color:var(--sub)">Use o dia real da entrega (é ele que conta no % de atraso), mesmo que você esteja registrando depois.</div>
       </div>
       <div class="field"><label>Observações</label><input id="e-obs" placeholder="Instrução de acesso, andar, referência..."></div>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
@@ -3375,6 +3395,15 @@ async function sincronizarEntregaComStatusVenda(vendaId, statusVenda){
 async function mudarStatusVenda(id,status){
   const v=vendas.find(x=>x.id===id); if(!v) return;
   const anterior=v.status;
+  // Marcar a venda como entregue tambem marca a entrega: pergunta o dia real (senao registrar depois conta como atraso)
+  let dataEntregaReal=null;
+  if(status==='entregue'){
+    const entLig=entregas.find(e=>e.vendaId==id && e.tipo!=='posvenda' && e.status!=='cancelado');
+    if(entLig && entLig.status!=='entregue' && !entLig.entregueEm){
+      dataEntregaReal=await pedirDataEntrega(entLig.dataISO);
+      if(!dataEntregaReal){ renderVendas(); return; }
+    }
+  }
   if(anterior!=='cancelado'&&status==='cancelado'){
     await ajustarEstoqueVenda(v.itens,1);
   }
@@ -3388,7 +3417,7 @@ async function mudarStatusVenda(id,status){
   if(status==='entregue'){
     const entLigada=entregas.find(e=>e.vendaId===id);
     if(entLigada && entLigada.status!=='entregue'){
-      const entregueEm=entLigada.entregueEm||hojeISO();
+      const entregueEm=entLigada.entregueEm||dataEntregaReal||dataPadraoEntregaRealizada(entLigada.dataISO);
       const {error:errEnt}=await sb.from('entregas').update({status:'entregue',entregue_em:entregueEm}).eq('id',entLigada.id);
       if(!errEnt) entregas=entregas.map(e=>e.id===entLigada.id?{...e,status:'entregue',entregueEm}:e);
     }
@@ -3566,12 +3595,36 @@ function filtrarDia(diaISO){
 function toggleMotivoReagendamento(){
   const status=document.getElementById('e-status').value;
   document.getElementById('wrap-motivo-reagendamento').style.display = status==='reagendado'?'block':'none';
+  document.getElementById('wrap-entregue-em').style.display = status==='entregue'?'block':'none';
+  const campo=document.getElementById('e-entregue-em');
+  campo.max=hojeISO();
+  if(status==='entregue' && !campo.value) campo.value=dataPadraoEntregaRealizada(document.getElementById('e-data').value);
 }
+// Data sugerida pra "entregue em": a data agendada (se ja passou) - quem registra no dia seguinte quase sempre entregou no prazo
+function dataPadraoEntregaRealizada(dataPrevistaISO){
+  const hoje=hojeISO();
+  return (dataPrevistaISO && dataPrevistaISO<=hoje) ? dataPrevistaISO : hoje;
+}
+function pedirDataEntrega(dataPrevistaISO){
+  return new Promise(resolve=>{
+    const campo=document.getElementById('de-data');
+    campo.max=hojeISO(); campo.value=dataPadraoEntregaRealizada(dataPrevistaISO);
+    window.__deResolve=resolve;
+    document.getElementById('modal-data-entrega').classList.add('open');
+  });
+}
+function confirmarDataEntrega(){
+  const v=document.getElementById('de-data').value;
+  if(!v){ alert('Informe a data da entrega.'); return; }
+  if(v>hojeISO()){ alert('A data da entrega não pode ser no futuro.'); return; }
+  fecharModal('data-entrega'); if(window.__deResolve) window.__deResolve(v);
+}
+function cancelarDataEntrega(){ fecharModal('data-entrega'); if(window.__deResolve) window.__deResolve(null); }
 function abrirModalEntrega(){
   editandoEntrega=null;
   document.getElementById('modal-entrega-titulo').textContent='Agendar Entrega';
   ['e-cliente','e-end','e-itens','e-obs'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('e-data').value='';
+  document.getElementById('e-data').value=''; document.getElementById('e-entregue-em').value='';
   document.getElementById('e-periodo').value='Manhã';
   document.getElementById('e-status').value='agendado';
   document.getElementById('e-motivo-reagendamento').value='A pedido do cliente';
@@ -3590,6 +3643,7 @@ function editarEntrega(id){
   document.getElementById('e-periodo').value=e.periodo||'Manhã';
   document.getElementById('e-status').value=e.status||'agendado';
   document.getElementById('e-motivo-reagendamento').value=e.motivoReagendamento||'A pedido do cliente';
+  document.getElementById('e-entregue-em').value=e.entregueEm||'';
   toggleMotivoReagendamento();
   document.getElementById('e-obs').value=e.obs||'';
   popularSelectVendas(); document.getElementById('e-venda').value=e.vendaId||'';
@@ -3611,7 +3665,7 @@ async function salvarEntrega(){
     status, obs:document.getElementById('e-obs').value,
     vendaId:document.getElementById('e-venda').value||null,
     motivoReagendamento: status==='reagendado' ? document.getElementById('e-motivo-reagendamento').value : (entregaAnterior?.motivoReagendamento||''),
-    entregueEm: status==='entregue' ? (entregaAnterior?.entregueEm || hojeISO()) : (entregaAnterior?.entregueEm||''),
+    entregueEm: status==='entregue' ? (document.getElementById('e-entregue-em').value || entregaAnterior?.entregueEm || dataPadraoEntregaRealizada(dataISO)) : (entregaAnterior?.entregueEm||''),
     tipo: entregaAnterior?.tipo||'entrega', posVendaId: entregaAnterior?.posVendaId||null
   };
   const btn=document.getElementById('btn-salvar-entrega'); btn.disabled=true;
@@ -3639,7 +3693,9 @@ async function mudarStatusEntrega(id,status){
     patch.motivo_reagendamento = mapa[motivo.trim()] || motivo.trim() || 'Não informado';
   }
   if(status==='entregue' && !ent0.entregueEm){
-    patch.entregue_em = hojeISO();
+    const dataReal=await pedirDataEntrega(ent0.dataISO);
+    if(!dataReal){ renderEntregas(); return; }   // cancelou: volta o status na tela
+    patch.entregue_em = dataReal;
   }
   const {error}=await sb.from('entregas').update(patch).eq('id',id);
   if(error){ alert('Erro: '+error.message); return; }
