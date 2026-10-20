@@ -353,6 +353,9 @@ async function carregarLogoBase64Vend(url){
     });
   } catch(e){ return null; }
 }
+// Datas "AAAA-MM-DD" no fuso LOCAL (toISOString usa UTC e vira o dia seguinte depois das 20h/21h no Brasil)
+function isoLocal(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function hojeISO(){ return isoLocal(new Date()); }
 const fR=v=>'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const LB={pendente:'Pendente',confirmado:'Confirmado',entregue:'Entregue',cancelado:'Cancelado'};
 const CL={pendente:'#FEF9C3',confirmado:'#DBEAFE',entregue:'#DCFCE7',cancelado:'#FEE2E2'};
@@ -458,8 +461,8 @@ function ir(id){
   document.getElementById('ab-'+id).classList.add('at');
   if(id==='i') cD();
   if(id==='mv') cMV();
-  if(id==='nv'){ rI(); document.getElementById('vpr').min=new Date().toISOString().slice(0,10); }
-  if(id==='oc'){ ocView('form'); rO(); if(!document.getElementById('oval').value){ const v=new Date(); v.setDate(v.getDate()+7); document.getElementById('oval').value=v.toISOString().slice(0,10); } }
+  if(id==='nv'){ rI(); document.getElementById('vpr').min=hojeISO(); }
+  if(id==='oc'){ ocView('form'); rO(); if(!document.getElementById('oval').value){ const v=new Date(); v.setDate(v.getDate()+7); document.getElementById('oval').value=isoLocal(v); } }
   if(id==='pv'){ pvView('form'); if(!vendasCache.length) cMV(); }
   if(id==='cal'){ semanaOffsetVend=0; renderCalVend(); }
   fecharDrawer();
@@ -711,7 +714,7 @@ async function reg(){
     pgto2:(dividir&&valor2>0)?pgto2:'', bandeira2, parcelas2, taxa_pct2:taxaPct2, taxa_valor2:taxaValor2, valor2:(dividir?valor2:0),
     pgto_recebido:'nao', vendedora_id:vid||null, perfil_vendedora_id:pid,
     status:'pendente', previsao_iso:previsaoISO, obs:document.getElementById('vo').value,
-    data_venda:new Date().toISOString().slice(0,10)
+    data_venda:hojeISO()
   };
   const {data,error}=await sb.from('vendas').insert(row).select().single();
   if(error){ alert('Erro: '+error.message); btn.textContent='Registrar Venda'; btn.disabled=false; return; }
@@ -1085,7 +1088,7 @@ async function converterOrcamentoEmPedido(id){
     pgto2:o.pgto2||'', bandeira2:o.bandeira2||'', parcelas2:o.parcelas2||'', taxa_pct2:o.taxa_pct2||0, taxa_valor2:o.taxa_valor2||0, valor2:o.valor2||0,
     pgto_recebido:'nao', vendedora_id:vid||null, perfil_vendedora_id:pid,
     status:'pendente', previsao_iso:previsaoISO, obs:o.obs||'',
-    data_venda:new Date().toISOString().slice(0,10)
+    data_venda:hojeISO()
   };
   const {data,error}=await sb.from('vendas').insert(row).select().single();
   if(error){ alert('Erro ao criar o pedido: '+error.message); return; }

@@ -1368,6 +1368,9 @@ let itensVendaTemp = [];
 let promoProdId = null;
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
+// Datas "AAAA-MM-DD" no fuso LOCAL (toISOString usa UTC e vira o dia seguinte depois das 20h/21h no Brasil)
+function isoLocal(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function hojeISO(){ return isoLocal(new Date()); }
 const fmtR = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const badge = (txt, cls) => `<span class="badge ${cls}">${txt}</span>`;
 function hoje(){ return new Date().toLocaleDateString('pt-BR'); }
@@ -1505,12 +1508,12 @@ function getPeriodoRange(prefix){
   if(sel==='mes-atual'){
     const inicio=new Date(hoje.getFullYear(),hoje.getMonth(),1);
     const fim=new Date(hoje.getFullYear(),hoje.getMonth()+1,0);
-    return { de:inicio.toISOString().slice(0,10), ate:fim.toISOString().slice(0,10), todos:false };
+    return { de:isoLocal(inicio), ate:isoLocal(fim), todos:false };
   }
   if(sel==='mes-anterior'){
     const inicio=new Date(hoje.getFullYear(),hoje.getMonth()-1,1);
     const fim=new Date(hoje.getFullYear(),hoje.getMonth(),0);
-    return { de:inicio.toISOString().slice(0,10), ate:fim.toISOString().slice(0,10), todos:false };
+    return { de:isoLocal(inicio), ate:isoLocal(fim), todos:false };
   }
   if(sel==='personalizado'){
     const de=document.getElementById(prefix+'-data-de')?.value||null;
@@ -1552,7 +1555,7 @@ function renderDash(){
   }).reduce((a,v)=>a+v.total,0);
   const inicioMesAnt = new Date(hoje3.getFullYear(), hoje3.getMonth()-1, 1);
   const fimMesAnt = new Date(hoje3.getFullYear(), hoje3.getMonth(), 0);
-  const rangeMesAnt = { de:inicioMesAnt.toISOString().slice(0,10), ate:fimMesAnt.toISOString().slice(0,10), todos:false };
+  const rangeMesAnt = { de:isoLocal(inicioMesAnt), ate:isoLocal(fimMesAnt), todos:false };
   const aReceberMesAnterior = vendasAtivasTodas.filter(v=>v.pgtoRecebido!=='sim' && dentroDoPeriodo(v.dataISO,rangeMesAnt)).reduce((a,v)=>a+v.total,0);
   const posVendaAbertos = posVendas.filter(p=>p.status!=='concluido').length;
   const kpis = [
@@ -1604,7 +1607,7 @@ function renderProd(){
   });
   const tbody = document.getElementById('tbody-prod');
   if(!lista.length){ tbody.innerHTML=`<tr><td colspan="11" class="sem-dados">Nenhum produto encontrado.</td></tr>`; return; }
-  const hoje2 = new Date().toISOString().slice(0,10);
+  const hoje2 = hojeISO();
   tbody.innerHTML = lista.map(p=>{
     const precoVigente = (p.promo && p.promo.ativo && (!p.promo.fim || p.promo.fim >= hoje2)) ? p.promo.precoPromo : p.preco;
     const mg = precoVigente>0?Math.round((precoVigente-p.custo)/precoVigente*100):0;
@@ -2111,7 +2114,7 @@ async function salvarMov(){
   if(errUpd){ btn.disabled=false; alert('Erro: '+errUpd.message); return; }
   const {data,error} = await sb.from('movimentacoes').insert({
     tabela:tab, tipo, item_id:itemId, nome_item:item.nome, qtd, motivo, pedido: pedido||null,
-    perfil_id: masterUid, data_mov: new Date().toISOString().slice(0,10)
+    perfil_id: masterUid, data_mov: hojeISO()
   }).select().single();
   btn.disabled=false;
   if(error){ alert('Erro: '+error.message); return; }
@@ -2893,7 +2896,7 @@ async function transformarOrcamentoEmPedidoMaster(id){
     pgto2:o.pgto2||'', bandeira2:o.bandeira2||'', parcelas2:o.parcelas2||'', taxa_pct2:o.taxa_pct2||0, taxa_valor2:o.taxa_valor2||0, valor2:o.valor2||0,
     pgto_recebido:'nao', vendedora_id:o.vendedora_id||null, perfil_vendedora_id:o.perfil_vendedora_id||null,
     status:'pendente', previsao_iso:previsaoISO, obs:o.obs||'',
-    data_venda:new Date().toISOString().slice(0,10)
+    data_venda:hojeISO()
   };
   const {data,error}=await sb.from('vendas').insert(row).select().single();
   if(error){ alert('Erro ao criar o pedido: '+error.message); return; }
@@ -2922,7 +2925,7 @@ function abrirModalVenda(){
   document.getElementById('v-status').value='pendente';
   document.getElementById('v-pgto-recebido').value='nao';
   document.getElementById('v-desconto-modo').value='R$';
-  document.getElementById('v-data').value=new Date().toISOString().slice(0,10);
+  document.getElementById('v-data').value=hojeISO();
   document.getElementById('v-previsao').value='';
   document.getElementById('auto-entrega-aviso').style.display='none';
   document.getElementById('bloco-maquininha').style.display='none';
@@ -3056,7 +3059,7 @@ async function salvarVenda(){
   const vendaAnterior = editandoVenda ? vendas.find(v=>v.id===editandoVenda) : null;
   const isNova = !editandoVenda;
   const pgtoRecebidoNovo=document.getElementById('v-pgto-recebido').value;
-  const dataRecebimento = pgtoRecebidoNovo==='sim' ? (vendaAnterior?.pgtoRecebido==='sim' ? (vendaAnterior.dataRecebimento||new Date().toISOString().slice(0,10)) : new Date().toISOString().slice(0,10)) : null;
+  const dataRecebimento = pgtoRecebidoNovo==='sim' ? (vendaAnterior?.pgtoRecebido==='sim' ? (vendaAnterior.dataRecebimento||hojeISO()) : hojeISO()) : null;
   const obj={
     cliente, tel:document.getElementById('v-tel').value, cpf:document.getElementById('v-cpf').value,
     endRua, endNum, endCidade, endEstado,
@@ -3108,7 +3111,7 @@ async function salvarVenda(){
 }
 async function mudarPgtoRecebido(id,valor){
   const v=vendas.find(x=>x.id===id);
-  const dataRecebimento = valor==='sim' ? (v?.dataRecebimento || new Date().toISOString().slice(0,10)) : null;
+  const dataRecebimento = valor==='sim' ? (v?.dataRecebimento || hojeISO()) : null;
   const {error}=await sb.from('vendas').update({pgto_recebido:valor, data_recebimento:dataRecebimento}).eq('id',id);
   if(error){ alert('Erro: '+error.message); return; }
   vendas=vendas.map(x=>x.id===id?{...x,pgtoRecebido:valor,dataRecebimento:dataRecebimento||''}:x);
@@ -3143,7 +3146,7 @@ async function mudarStatusVenda(id,status){
   if(status==='entregue'){
     const entLigada=entregas.find(e=>e.vendaId===id);
     if(entLigada && entLigada.status!=='entregue'){
-      const entregueEm=entLigada.entregueEm||new Date().toISOString().slice(0,10);
+      const entregueEm=entLigada.entregueEm||hojeISO();
       const {error:errEnt}=await sb.from('entregas').update({status:'entregue',entregue_em:entregueEm}).eq('id',entLigada.id);
       if(!errEnt) entregas=entregas.map(e=>e.id===entLigada.id?{...e,status:'entregue',entregueEm}:e);
     }
@@ -3366,7 +3369,7 @@ async function salvarEntrega(){
     status, obs:document.getElementById('e-obs').value,
     vendaId:document.getElementById('e-venda').value||null,
     motivoReagendamento: status==='reagendado' ? document.getElementById('e-motivo-reagendamento').value : (entregaAnterior?.motivoReagendamento||''),
-    entregueEm: status==='entregue' ? (entregaAnterior?.entregueEm || new Date().toISOString().slice(0,10)) : (entregaAnterior?.entregueEm||''),
+    entregueEm: status==='entregue' ? (entregaAnterior?.entregueEm || hojeISO()) : (entregaAnterior?.entregueEm||''),
     tipo: entregaAnterior?.tipo||'entrega', posVendaId: entregaAnterior?.posVendaId||null
   };
   const btn=document.getElementById('btn-salvar-entrega'); btn.disabled=true;
@@ -3394,7 +3397,7 @@ async function mudarStatusEntrega(id,status){
     patch.motivo_reagendamento = mapa[motivo.trim()] || motivo.trim() || 'Não informado';
   }
   if(status==='entregue' && !ent0.entregueEm){
-    patch.entregue_em = new Date().toISOString().slice(0,10);
+    patch.entregue_em = hojeISO();
   }
   const {error}=await sb.from('entregas').update(patch).eq('id',id);
   if(error){ alert('Erro: '+error.message); return; }
@@ -3416,7 +3419,7 @@ async function excluirEntrega(id){
 
 // ─── ROMANEIO DE ENTREGAS ─────────────────────────────────────────────────────
 function abrirModalRomaneio(){
-  document.getElementById('romaneio-data').value=new Date().toISOString().slice(0,10);
+  document.getElementById('romaneio-data').value=hojeISO();
   atualizarPreviewRomaneio();
   document.getElementById('modal-romaneio').classList.add('open');
 }
@@ -3552,7 +3555,7 @@ function abrirModalPromo(id){
   document.getElementById('modal-promo-titulo').textContent='Promoção — '+p.nome;
   document.getElementById('promo-nome-prod').textContent=p.nome;
   document.getElementById('promo-preco-normal').textContent='Preço normal: '+fmtR(p.preco);
-  const hoje2=new Date().toISOString().slice(0,10);
+  const hoje2=hojeISO();
   const promoAtiva=p.promo&&p.promo.ativo&&(!p.promo.fim||p.promo.fim>=hoje2);
   document.getElementById('promo-aviso-ativo').style.display=promoAtiva?'block':'none';
   document.getElementById('btn-remover-promo').style.display=promoAtiva?'inline-flex':'none';
@@ -3720,9 +3723,9 @@ function exportarBackup(){
 
 // ─── BACKUP IMPORT (restaura backup antigo do localStorage para o Supabase) ──
 function brParaISO(dataBR){
-  if(!dataBR) return new Date().toISOString().slice(0,10);
+  if(!dataBR) return hojeISO();
   const partes = String(dataBR).split('/');
-  if(partes.length!==3) return new Date().toISOString().slice(0,10);
+  if(partes.length!==3) return hojeISO();
   const [dd,mm,yy] = partes;
   return `${yy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
 }
@@ -3838,8 +3841,8 @@ function setPeriodo(tipo) {
   else if(tipo==='trimestre'){ ini=new Date(hoje2.getFullYear(),hoje2.getMonth()-3,1); fim=hoje2; }
   else if(tipo==='ano'){ ini=new Date(hoje2.getFullYear(),0,1); fim=new Date(hoje2.getFullYear(),11,31); }
   else if(tipo==='tudo'){ ini=null; fim=null; }
-  document.getElementById('pdf-periodo-ini').value = ini ? ini.toISOString().slice(0,10) : '';
-  document.getElementById('pdf-periodo-fim').value = fim ? fim.toISOString().slice(0,10) : '';
+  document.getElementById('pdf-periodo-ini').value = ini ? isoLocal(ini) : '';
+  document.getElementById('pdf-periodo-fim').value = fim ? isoLocal(fim) : '';
   atualizarLabelPeriodo();
 }
 function atualizarLabelPeriodo(){
@@ -3856,21 +3859,22 @@ function atualizarLabelPeriodo(){
 }
 function filtrarPorPeriodo(lista, campoData, ini, fim, isDataBR=false) {
   if(!ini && !fim) return lista;
+  // Compara datas como texto AAAA-MM-DD (inclusivo nos dois lados) - sem fuso horario,
+  // pra nao perder o primeiro dia nem incluir o dia seguinte.
   return lista.filter(item=>{
-    const raw = item[campoData];
+    let raw = item[campoData];
     if(!raw) return false;
-    let d;
-    if(isDataBR){ const [dd,mm,yy]=raw.split('/'); d=new Date(`${yy}-${mm}-${dd}`); }
-    else d=new Date(raw);
-    if(ini && d < ini) return false;
-    if(fim && d > fim) return false;
+    if(isDataBR){ const [dd,mm,yy]=raw.split('/'); raw=`${yy}-${mm}-${dd}`; }
+    raw = String(raw).slice(0,10);
+    if(ini && raw < ini) return false;
+    if(fim && raw > fim) return false;
     return true;
   });
 }
 function getPeriodo(){
   const iniVal=document.getElementById('pdf-periodo-ini').value;
   const fimVal=document.getElementById('pdf-periodo-fim').value;
-  return { ini: iniVal?new Date(iniVal+'T00:00:00'):null, fim: fimVal?new Date(fimVal+'T23:59:59'):null };
+  return { ini: iniVal||null, fim: fimVal||null };
 }
 function labelPeriodoTexto(){
   const ini=document.getElementById('pdf-periodo-ini').value;
