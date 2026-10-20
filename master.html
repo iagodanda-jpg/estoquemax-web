@@ -783,6 +783,12 @@
         <div style="color:var(--sub);font-size:13px;margin-bottom:16px">Matérias-primas com coluna em branco pra contagem física — pra imprimir e o funcionário preencher à mão.</div>
         <button class="btn" style="background:#6B7280;color:#fff" onclick="exportarPDF('conferencia')">Exportar PDF</button>
       </div>
+      <div class="card" style="border-left:5px solid #7C3AED">
+        <div style="margin-bottom:12px;color:#7C3AED"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg></div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:4px">Campanhas e Bonificações</div>
+        <div style="color:var(--sub);font-size:13px;margin-bottom:16px">Ranking, metas e bonificações das campanhas que tiveram dias dentro do período selecionado acima (sem período, traz todas).</div>
+        <button class="btn" style="background:#7C3AED;color:#fff" onclick="exportarPDF('campanhas')">Exportar PDF</button>
+      </div>
       <div class="card" style="border-left:5px solid var(--vm)">
         <div style="margin-bottom:12px;color:var(--vm)"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
         <div style="font-weight:700;font-size:15px;margin-bottom:4px">Alertas de Estoque</div>
@@ -4292,6 +4298,56 @@ function exportarPDF(tipo) {
     doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(90,106,138);
     doc.text('Conferido por: ______________________________     Data: ____/____/______', 14, yFinal);
     rodape(doc); doc.save(`conferencia-estoque-${dataHoje.replace(/\//g,'-')}.pdf`); return;
+  }
+  if(tipo==='campanhas') {
+    // campanhas que tiveram algum dia dentro do periodo escolhido (sem periodo: todas)
+    const lista=campanhas.filter(c=>(!pFim||c.data_inicio<=pFim)&&(!pIni||c.data_fim>=pIni)).sort((a,b)=>a.data_inicio.localeCompare(b.data_inicio));
+    if(!lista.length){ alert('Nenhuma campanha no período selecionado.'); return; }
+    let y = cabecalho('Relatório de Campanhas e Bonificações', lista.length+' campanha(s) · vendas do período de cada campanha, sem canceladas', [124,58,237]);
+    for(const c of lista){
+      const st=statusCampanha(c), calc=calcCampanha(c);
+      if(y>215){ doc.addPage(); y=20; }
+      doc.setFontSize(11.5); doc.setFont('helvetica','bold'); doc.setTextColor(30,40,64);
+      doc.text(c.nome, 14, y);
+      doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(90,106,138);
+      doc.text(`${c.tipo==='ranking'?'Ranking':'Meta por vendedora'}  ·  ${fmtDataBR(c.data_inicio)} a ${fmtDataBR(c.data_fim)}  ·  ${st.t}`, 14, y+5);
+      y+=10;
+      if(c.obs){ doc.text('Obs: '+c.obs, 14, y); y+=5; }
+      if(c.tipo==='ranking'){
+        const metaLoja=Number(c.meta_loja)||0;
+        const condTxt = metaLoja>0
+          ? `Meta da loja: ${fmtR(metaLoja)}  ·  Vendido pela loja: ${fmtR(calc.lojaTotal)} (${Math.round(calc.lojaTotal/metaLoja*100)}%)  ·  ${calc.condicaoOk?'Meta atingida - premiação liberada':'Meta NÃO atingida'+(st.k==='encerrada'?' - sem premiação':' até agora')}`
+          : `Vendido pela loja no período: ${fmtR(calc.lojaTotal)}  ·  sem meta mínima da loja`;
+        doc.text(condTxt, 14, y); y+=4;
+        const premios=[c.premio_1,c.premio_2,c.premio_3];
+        const linhas=calc.rows.filter(r=>r.total>0).map((r,i)=>{
+          let bon='';
+          if(i<3 && premios[i]) bon = calc.condicaoOk ? premios[i] : premios[i]+(st.k==='encerrada'?' (não liberado)':' (aguarda meta da loja)');
+          return [(i+1)+'º', r.nome, r.qtd, fmtR(r.total), bon];
+        });
+        doc.autoTable({ startY:y, margin:{left:14,right:14}, head:[['Pos.','Vendedora','Vendas','Total vendido','Bonificação']],
+          body: linhas.length?linhas:[['','Sem vendas no período','','','']],
+          styles:{fontSize:9,cellPadding:3}, headStyles:{fillColor:[124,58,237],textColor:255,fontStyle:'bold'}, alternateRowStyles:{fillColor:[245,243,255]},
+          columnStyles:{0:{halign:'center',cellWidth:14},2:{halign:'center',cellWidth:18},3:{halign:'right',cellWidth:32}} });
+      } else {
+        const meta=Number(c.meta_individual)||0;
+        doc.text(`Meta de cada vendedora: ${fmtR(meta)}  ·  Bonificação: ${c.premio_meta||'-'}`, 14, y); y+=4;
+        const linhas=calc.rows.slice().sort((a,b)=>b.total-a.total).filter(r=>r.total>0||r.total>=meta).map(r=>{
+          const bateu=meta>0&&r.total>=meta;
+          return [r.nome, fmtR(r.total), meta>0?Math.round(r.total/meta*100)+'%':'-', bateu?('Bateu a meta - '+(c.premio_meta||'bonificação')):('Faltam '+fmtR(Math.max(0,meta-r.total)))];
+        });
+        const qtd=calc.rows.filter(r=>meta>0&&r.total>=meta).length;
+        doc.autoTable({ startY:y, margin:{left:14,right:14}, head:[['Vendedora','Vendido','% da meta','Situação']],
+          body: linhas.length?linhas:[['Sem vendas no período','','','']],
+          styles:{fontSize:9,cellPadding:3}, headStyles:{fillColor:[124,58,237],textColor:255,fontStyle:'bold'}, alternateRowStyles:{fillColor:[245,243,255]},
+          columnStyles:{1:{halign:'right',cellWidth:32},2:{halign:'center',cellWidth:24}} });
+        doc.setFontSize(9); doc.setTextColor(90,106,138);
+        doc.text(`${qtd} vendedora(s) bateram a meta.`, 14, doc.lastAutoTable.finalY+5);
+        doc.lastAutoTable.finalY += 5;
+      }
+      y = doc.lastAutoTable.finalY + 12;
+    }
+    rodape(doc); doc.save(`campanhas-${dataHoje.replace(/\//g,'-')}.pdf`); return;
   }
   if(tipo==='alertas' || tipo==='completo') {
     if(tipo==='completo') doc.addPage();
