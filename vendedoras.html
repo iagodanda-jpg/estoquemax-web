@@ -524,7 +524,7 @@ async function login(){
   else { vnome=p.nome; document.getElementById('nu').textContent=p.nome.split(' ')[0]; }
   const {data:e}=await sb.from('empresa').select('*').eq('id',1).maybeSingle();
   if(e){ emp=e; enm=e.nome||enm; document.getElementById('en').textContent=enm; document.getElementById('en-drawer').textContent=enm; if(e.logo_url) empLogoBase64=await carregarLogoBase64Vend(e.logo_url); }
-  const {data:prs}=await sb.from('produtos').select('id,nome,preco,qtd').eq('ativo',true).order('nome');
+  const {data:prs}=await sb.from('produtos').select('id,nome,preco,qtd,cores').eq('ativo',true).order('nome');
   prods=prs||[];
   await carregarEntregasVend();
   document.getElementById('ls').style.display='none';
@@ -675,15 +675,31 @@ function buscarProduto(tipo, idx, termo){
   box.innerHTML=matches.map(p=>{
     const qtd=Number(p.qtd||0);
     const corEstoque=qtd<=0?'var(--vm)':qtd<=3?'#B45309':'var(--sub)';
-    return `<div onmousedown="event.preventDefault()" onclick="selecionarProduto('${tipo}',${idx},${p.id})" style="padding:9px 12px;cursor:pointer;font-size:13.5px;border-bottom:1px solid #F0F4F8">${p.nome} <span style="color:var(--sub);font-size:12px">— ${fR(p.preco)}</span> <span style="color:${corEstoque};font-size:11.5px;font-weight:700">· ${qtd} em estoque</span></div>`;
+    const cs=coresP(p);
+    const linhaCores=cs.length?`<div style="margin-top:3px;font-size:11.5px;line-height:1.6">${cs.map(c=>{ const q=Number(c.qtd)||0; return `<span style="display:inline-block;margin:0 4px 2px 0;padding:1px 7px;border-radius:10px;font-weight:700;background:${q<=0?'#FEE2E2':q<=2?'#FEF3C7':'#DCFCE7'};color:${q<=0?'#B91C1C':q<=2?'#92400E':'#166534'}">${c.nome}: ${q>0?q:'sem estoque'}</span>`; }).join('')}</div>`:'';
+    return `<div onmousedown="event.preventDefault()" onclick="selecionarProduto('${tipo}',${idx},${p.id})" style="padding:9px 12px;cursor:pointer;font-size:13.5px;border-bottom:1px solid #F0F4F8">${p.nome} <span style="color:var(--sub);font-size:12px">— ${fR(p.preco)}</span> <span style="color:${corEstoque};font-size:11.5px;font-weight:700">· ${qtd} em estoque</span>${linhaCores}</div>`;
   }).join('');
   box.style.display='block';
 }
 function selecionarProduto(tipo, idx, prodId){
   const pr=prods.find(x=>x.id==prodId); if(!pr) return;
-  if(tipo==='it'){ it[idx]={id:pr.id,n:pr.nome,q:it[idx].q,p:Number(pr.preco),pMin:Number(pr.preco)}; rI(); }
-  else { oi[idx]={id:pr.id,n:pr.nome,q:oi[idx].q,p:Number(pr.preco),pMin:Number(pr.preco)}; rO(); }
+  const arr=tipo==='it'?it:oi;
+  arr[idx]={id:pr.id,n:pr.nome,q:arr[idx].q,p:Number(pr.preco),pMin:Number(pr.preco)};
+  const cs=coresP(pr); if(cs.length===1) arr[idx].cor=cs[0].nome;
+  if(tipo==='it') rI(); else rO();
 }
+// ─── CORES DO PRODUTO ───
+function coresP(p){ return Array.isArray(p&&p.cores)?p.cores:[]; }
+function nomeItemCor(i){ return i.cor?i.n+' — '+i.cor:i.n; }
+function selectCor(tipo, idx, i){
+  const cs=coresP(prods.find(x=>x.id==i.id)); if(!cs.length) return '';
+  return `<select onchange="escolherCor('${tipo}',${idx},this.value)" style="margin-top:4px;border:1.5px solid ${i.cor?'var(--borda)':'#F59E0B'};border-radius:10px;padding:9px 11px;font-size:13.5px;width:100%"><option value="">Escolha a cor...</option>${cs.map(c=>{ const q=Number(c.qtd)||0; return `<option value="${String(c.nome).replace(/"/g,'&quot;')}"${i.cor===c.nome?' selected':''}>${c.nome} — ${q>0?q+' em estoque':'sem estoque'}</option>`; }).join('')}</select>`;
+}
+function escolherCor(tipo, idx, cor){
+  const arr=tipo==='it'?it:oi; arr[idx].cor=cor||undefined;
+  if(tipo==='it') rI(); else rO();
+}
+function itemSemCor(arr){ return arr.find(i=>i.id && coresP(prods.find(x=>x.id==i.id)).length && !i.cor); }
 function fecharSugestoes(tipo, idx){
   setTimeout(()=>{
     const box=document.getElementById(`sug-${tipo}-${idx}`); if(box) box.style.display='none';
@@ -732,6 +748,7 @@ function rI(){
     <div style="position:relative">
       <input type="text" id="inp-it-${idx}" placeholder="Buscar produto..." value="${(i.n||'').replace(/"/g,'&quot;')}" oninput="buscarProduto('it',${idx},this.value)" onfocus="this.select();buscarProduto('it',${idx},'')" onblur="fecharSugestoes('it',${idx})" autocomplete="off" style="border:1.5px solid var(--borda);border-radius:10px;padding:11px 13px;font-size:14px;width:100%">
       <div id="sug-it-${idx}" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--borda);border-radius:8px;margin-top:2px;max-height:180px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div>
+      ${selectCor('it',idx,i)}
     </div>
     <input type="number" min="1" value="${i.q}" onchange="uQ(${idx},this.value)" style="text-align:center">
     <input type="number" min="${i.pMin||0}" step="0.01" value="${i.p||0}" onchange="uPr(${idx},this.value)" ${i.id?'':'disabled'} title="Preço unitário (mínimo: preço cadastrado)" style="text-align:center">
@@ -751,16 +768,22 @@ function addI(){ it.push({id:'',n:'',q:1,p:0}); rI(); }
 async function ajustarEstoqueVend(itens, sinal){
   for(const item of itens){
     const p=prods.find(x=>x.id==item.id); if(!p) continue;
-    const novaQtd=Math.max(0,(Number(p.qtd)||0)+sinal*item.qtd);
-    const {data,error}=await sb.from('produtos').update({qtd:novaQtd}).eq('id',p.id).select('id');
+    let novaQtd=Math.max(0,(Number(p.qtd)||0)+sinal*item.qtd);
+    const patch={qtd:novaQtd}; let novasCores=null;
+    if(item.cor && coresP(p).some(c=>c.nome===item.cor)){
+      novasCores=coresP(p).map(c=>c.nome===item.cor?{...c,qtd:Math.max(0,(Number(c.qtd)||0)+sinal*item.qtd)}:c);
+      novaQtd=novasCores.reduce((a,c)=>a+(Number(c.qtd)||0),0); patch.qtd=novaQtd; patch.cores=novasCores;
+    }
+    const {data,error}=await sb.from('produtos').update(patch).eq('id',p.id).select('id');
     if(error||!data||!data.length){ alert('Aviso: não consegui atualizar o estoque de "'+p.nome+'" (verifique com o administrador). A venda foi registrada normalmente.'); continue; }
-    p.qtd=novaQtd;
+    p.qtd=novaQtd; if(novasCores) p.cores=novasCores;
   }
 }
 async function reg(){
   const c=document.getElementById('vc').value.trim();
   if(!c) return alert('Informe o cliente');
-  const its=it.filter(i=>i.id).map(i=>({id:i.id,nome:i.n,qtd:i.q,preco:i.p}));
+  const semCor=itemSemCor(it); if(semCor) return alert('Escolha a cor do produto "'+semCor.n+'".');
+  const its=it.filter(i=>i.id).map(i=>({id:i.id,nome:nomeItemCor(i),qtd:i.q,preco:i.p,...(i.cor?{cor:i.cor}:{})}));
   if(!its.length) return alert('Adicione um produto');
   const btn=document.getElementById('br'); btn.textContent='...'; btn.disabled=true;
   const subtotal=its.reduce((a,i)=>a+i.qtd*i.preco,0);
@@ -910,6 +933,7 @@ function rO(){
     <div style="position:relative">
       <input type="text" id="inp-oi-${idx}" placeholder="Buscar produto..." value="${(i.n||'').replace(/"/g,'&quot;')}" oninput="buscarProduto('oi',${idx},this.value)" onfocus="this.select();buscarProduto('oi',${idx},'')" onblur="fecharSugestoes('oi',${idx})" autocomplete="off" style="border:1.5px solid var(--borda);border-radius:10px;padding:11px 13px;font-size:14px;width:100%">
       <div id="sug-oi-${idx}" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--borda);border-radius:8px;margin-top:2px;max-height:180px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div>
+      ${selectCor('oi',idx,i)}
     </div>
     <input type="number" min="1" value="${i.q}" onchange="uO(${idx},this.value)" style="text-align:center">
     <input type="number" min="${i.pMin||0}" step="0.01" value="${i.p||0}" onchange="uOPr(${idx},this.value)" ${i.id?'':'disabled'} title="Preço unitário (mínimo: preço cadastrado)" style="text-align:center">
@@ -1029,6 +1053,7 @@ function calcO(){
 function gO(){
   const c=document.getElementById('oc').value.trim(), its=oi.filter(i=>i.id);
   if(!c||!its.length) return alert('Informe o cliente e produtos');
+  const semCor=itemSemCor(oi); if(semCor) return alert('Escolha a cor do produto "'+semCor.n+'".');
   const subtotal=its.reduce((a,i)=>a+i.q*i.p,0);
   const descRaw=Number(document.getElementById('odesc').value||0);
   const descModo=document.getElementById('odescmodo').value;
@@ -1057,7 +1082,7 @@ function gO(){
   if(cpf) tx+=`\n*CPF:* ${cpf}`;
   if(endTxt) tx+=`\n*Endereço:* ${endTxt}`;
   tx+=`\n*Data:* ${hj}\n\n`;
-  tx+=its.map(i=>`• ${i.q}x ${i.n} - ${fR(i.p)} = *${fR(i.q*i.p)}*`).join('\n');
+  tx+=its.map(i=>`• ${i.q}x ${nomeItemCor(i)} - ${fR(i.p)} = *${fR(i.q*i.p)}*`).join('\n');
   if(descValor>0) tx+=`\n\n_Desconto: -${fR(descValor)}_`;
   tx+=`\n\n*TOTAL: ${fR(total)}*`;
   tx+=`\n*Forma de pagamento:* ${pgtoTxt}`;
@@ -1097,8 +1122,9 @@ async function cOH(){
   }).join('') : '<div style="text-align:center;color:var(--sub);padding:30px">Nenhum orçamento salvo ainda</div>';
 }
 async function salvarOrcamento(){
-  const c=document.getElementById('oc').value.trim(), its=oi.filter(i=>i.id).map(i=>({id:i.id,nome:i.n,qtd:i.q,preco:i.p}));
+  const c=document.getElementById('oc').value.trim(), its=oi.filter(i=>i.id).map(i=>({id:i.id,nome:nomeItemCor(i),qtd:i.q,preco:i.p,...(i.cor?{cor:i.cor}:{})}));
   if(!c||!its.length) return alert('Informe o cliente e produtos');
+  const semCor=itemSemCor(oi); if(semCor) return alert('Escolha a cor do produto "'+semCor.n+'".');
   const btn=document.getElementById('bso'); btn.textContent='...'; btn.disabled=true;
   const subtotal=its.reduce((a,i)=>a+i.qtd*i.preco,0);
   const descRaw=Number(document.getElementById('odesc').value||0);
@@ -1449,7 +1475,7 @@ async function gerarPosVendaPDF(pv){
       else { vnome=p.nome; document.getElementById('nu').textContent=p.nome.split(' ')[0]; }
       const {data:e}=await sb.from('empresa').select('*').eq('id',1).maybeSingle();
       if(e){ emp=e; enm=e.nome||enm; document.getElementById('en').textContent=enm; document.getElementById('en-drawer').textContent=enm; if(e.logo_url) empLogoBase64=await carregarLogoBase64Vend(e.logo_url); }
-      const {data:prs}=await sb.from('produtos').select('id,nome,preco,qtd').eq('ativo',true).order('nome');
+      const {data:prs}=await sb.from('produtos').select('id,nome,preco,qtd,cores').eq('ativo',true).order('nome');
       prods=prs||[];
       await carregarEntregasVend();
       document.getElementById('ls').style.display='none';

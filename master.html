@@ -1024,6 +1024,15 @@
       </div>
       <div class="field"><label>Preço de Venda (R$)</label><input id="prod-preco" type="number" min="0" step="0.01" oninput="calcMargem()"></div>
       <div id="margem-preview" class="margem-ok" style="display:none"></div>
+      <div class="field" style="background:var(--fundo);border-radius:10px;padding:12px">
+        <label>Cores disponíveis (opcional)</label>
+        <div style="display:flex;gap:6px">
+          <input id="prod-cores-texto" placeholder="Digite as cores separadas por vírgula: Cinza, Bege, Preto" onkeydown="if(event.key==='Enter'){event.preventDefault();adicionarCoresProd();}">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="adicionarCoresProd()" style="white-space:nowrap">+ Adicionar</button>
+        </div>
+        <div id="prod-cores-lista" style="margin-top:8px"></div>
+        <div style="font-size:11.5px;color:var(--sub)">Com cores cadastradas, informe a quantidade de cada uma — o estoque total do produto passa a ser a soma delas, e as vendedoras veem se tem estoque de cada cor.</div>
+      </div>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
         <button class="btn btn-ghost" onclick="fecharModal('prod')">Cancelar</button>
         <button class="btn btn-success" id="btn-salvar-prod" onclick="salvarProd()">Salvar</button>
@@ -1041,7 +1050,8 @@
         <div class="field"><label>Tipo de Estoque</label><select id="mov-tabela" onchange="popularItens()"><option value="produto">Produto</option><option value="mp">Matéria-Prima</option></select></div>
         <div class="field"><label>Movimento</label><select id="mov-tipo" onchange="popularMotivos()"><option value="entrada">Entrada</option><option value="saida">Saída</option></select></div>
       </div>
-      <div class="field"><label>Item</label><select id="mov-item" onchange="checkEstoque()"></select></div>
+      <div class="field"><label>Item</label><select id="mov-item" onchange="popularCoresMov();checkEstoque()"></select></div>
+      <div class="field" id="mov-cor-wrap" style="display:none"><label>Cor</label><select id="mov-cor" onchange="checkEstoque()"></select></div>
       <div class="grid2">
         <div class="field"><label>Quantidade</label><input id="mov-qtd" type="number" min="1" oninput="checkEstoque()"></div>
         <div class="field"><label>Nº Pedido (opcional)</label><input id="mov-pedido" placeholder="Ex: PED-001"></div>
@@ -1697,7 +1707,7 @@ function renderProd(){
     const baixo = p.qtd<p.minimo;
     const promoAtiva = p.promo && p.promo.ativo && (!p.promo.fim || p.promo.fim >= hoje2);
     return `<tr style="${promoAtiva?'background:#FFFBEB':''}">
-      <td><b>${p.nome}</b>${promoAtiva?`<div style="font-size:10px;color:var(--am);font-weight:700;margin-top:2px">${p.promo.motivo||'EM PROMOÇÃO'}</div>`:''}</td>
+      <td><b>${p.nome}</b>${coresDe(p).length?`<div style="font-size:11px;color:var(--sub);margin-top:2px">${coresDe(p).map(c=>`<span style="${Number(c.qtd)>0?'':'color:var(--vm)'}">${c.nome} (${c.qtd})</span>`).join(' · ')}</div>`:''}${promoAtiva?`<div style="font-size:10px;color:var(--am);font-weight:700;margin-top:2px">${p.promo.motivo||'EM PROMOÇÃO'}</div>`:''}</td>
       <td>${badge(p.tipo==='fabricado'?'Fabricado':'Revenda',p.tipo==='fabricado'?'badge-azul':'badge-verde')}</td>
       <td style="color:var(--sub)">${p.categoria||''}</td>
       <td style="font-weight:700;color:${baixo?'var(--vm)':'var(--txt)'}">${p.qtd}</td>
@@ -1746,6 +1756,7 @@ function renderMP(){
 // ─── RENDER MOVIMENTAÇÕES ────────────────────────────────────────────────────
 function renderMov(){
   const tbody = document.getElementById('tbody-mov');
+  if(!tbody) return;
   if(!movimentacoes.length){ tbody.innerHTML=`<tr><td colspan="8" class="sem-dados">Nenhuma movimentação ainda.</td></tr>`; return; }
   tbody.innerHTML = movimentacoes.map(m=>`<tr>
     <td style="color:var(--sub)">#${m.id}</td><td>${m.data}</td>
@@ -2217,7 +2228,39 @@ async function uploadArquivoFuncionario(event, campo){
 }
 
 // ─── PRODUTO CRUD ─────────────────────────────────────────────────────────────
-function abrirModalProd(){ editandoProd=null; document.getElementById('modal-prod-titulo').textContent='Novo Produto'; ['prod-nome','prod-qtd','prod-min','prod-custo','prod-preco'].forEach(id=>document.getElementById(id).value=''); document.getElementById('margem-preview').style.display='none'; document.getElementById('modal-prod').classList.add('open'); }
+// ─── CORES DO PRODUTO ─────────────────────────────────────────────────────────
+function coresDe(p){ return Array.isArray(p&&p.cores)?p.cores:[]; }
+let prodCoresTemp=[];
+function renderProdCores(){
+  const el=document.getElementById('prod-cores-lista'); if(!el) return;
+  el.innerHTML=prodCoresTemp.map((c,i)=>`<div style="display:grid;grid-template-columns:1fr 90px 30px;gap:6px;margin-bottom:6px;align-items:center">
+      <input value="${String(c.nome).replace(/"/g,'&quot;')}" onchange="atualizarCorProd(${i},'nome',this.value)" placeholder="Cor">
+      <input type="number" min="0" value="${c.qtd}" onchange="atualizarCorProd(${i},'qtd',this.value)" title="Quantidade em estoque dessa cor">
+      <button type="button" onclick="removerCorProd(${i})" style="background:#FEE2E2;border:none;border-radius:8px;color:var(--vm);cursor:pointer;height:34px">&times;</button>
+    </div>`).join('');
+  const qtdEl=document.getElementById('prod-qtd');
+  if(prodCoresTemp.length){ qtdEl.value=prodCoresTemp.reduce((a,c)=>a+(Number(c.qtd)||0),0); qtdEl.readOnly=true; qtdEl.title='Soma das cores'; }
+  else { qtdEl.readOnly=false; qtdEl.title=''; }
+}
+function adicionarCoresProd(){
+  const inp=document.getElementById('prod-cores-texto');
+  inp.value.split(/[,;\n]/).map(s=>s.trim()).filter(Boolean).forEach(nome=>{
+    if(!prodCoresTemp.some(c=>c.nome.toLowerCase()===nome.toLowerCase())) prodCoresTemp.push({nome,qtd:0});
+  });
+  inp.value=''; renderProdCores();
+}
+function atualizarCorProd(i,campo,val){
+  if(campo==='qtd') prodCoresTemp[i].qtd=Math.max(0,Math.floor(Number(val)||0));
+  else prodCoresTemp[i].nome=String(val).trim();
+  renderProdCores();
+}
+function removerCorProd(i){ prodCoresTemp.splice(i,1); renderProdCores(); }
+// Ajusta a quantidade de uma cor e devolve {cores, qtd} com o total recalculado (soma das cores)
+function ajustarCoresProduto(p, nomeCor, delta){
+  const cores=coresDe(p).map(c=>c.nome===nomeCor?{...c,qtd:Math.max(0,(Number(c.qtd)||0)+delta)}:c);
+  return {cores, qtd:cores.reduce((a,c)=>a+(Number(c.qtd)||0),0)};
+}
+function abrirModalProd(){ editandoProd=null; document.getElementById('modal-prod-titulo').textContent='Novo Produto'; ['prod-nome','prod-qtd','prod-min','prod-custo','prod-preco'].forEach(id=>document.getElementById(id).value=''); document.getElementById('margem-preview').style.display='none'; prodCoresTemp=[]; document.getElementById('prod-cores-texto').value=''; renderProdCores(); document.getElementById('modal-prod').classList.add('open'); }
 function editarProd(id){
   const p=produtos.find(x=>x.id===id); if(!p) return;
   editandoProd=id;
@@ -2229,6 +2272,9 @@ function editarProd(id){
   document.getElementById('prod-min').value=p.minimo;
   document.getElementById('prod-custo').value=p.custo;
   document.getElementById('prod-preco').value=p.preco;
+  prodCoresTemp=coresDe(p).map(c=>({nome:c.nome,qtd:Number(c.qtd)||0}));
+  document.getElementById('prod-cores-texto').value='';
+  renderProdCores();
   calcMargem();
   document.getElementById('modal-prod').classList.add('open');
 }
@@ -2241,9 +2287,11 @@ function calcMargem(){
 }
 async function salvarProd(){
   const nome=document.getElementById('prod-nome').value.trim();
-  const qtd=Number(document.getElementById('prod-qtd').value);
+  adicionarCoresProd(); // aceita cores digitadas e ainda nao adicionadas
+  const cores=prodCoresTemp.filter(c=>c.nome).map(c=>({nome:c.nome,qtd:Math.max(0,Math.floor(Number(c.qtd)||0))}));
+  const qtd=cores.length?cores.reduce((a,c)=>a+c.qtd,0):Number(document.getElementById('prod-qtd').value);
   if(!nome||isNaN(qtd)){ alert('Preencha nome e quantidade.'); return; }
-  const obj={nome,tipo:document.getElementById('prod-tipo').value,categoria:document.getElementById('prod-cat').value,unidade:'un',qtd,minimo:Number(document.getElementById('prod-min').value),custo:Number(document.getElementById('prod-custo').value),preco:Number(document.getElementById('prod-preco').value)};
+  const obj={nome,tipo:document.getElementById('prod-tipo').value,categoria:document.getElementById('prod-cat').value,unidade:'un',qtd,minimo:Number(document.getElementById('prod-min').value),custo:Number(document.getElementById('prod-custo').value),preco:Number(document.getElementById('prod-preco').value),cores};
   const btn=document.getElementById('btn-salvar-prod'); btn.disabled=true;
   if(editandoProd){
     const {data,error}=await sb.from('produtos').update(obj).eq('id',editandoProd).select().single();
@@ -2272,7 +2320,7 @@ function popularItens(){
   const sel=document.getElementById('mov-item');
   const lista=tab==='mp'?materias:produtos;
   sel.innerHTML=lista.map(i=>`<option value="${i.id}">${i.nome} (estoque: ${i.qtd})</option>`).join('');
-  popularMotivos();
+  popularMotivos(); popularCoresMov();
 }
 function popularMotivos(){
   const tab=document.getElementById('mov-tabela').value;
@@ -2289,6 +2337,15 @@ function popularMotivos(){
   else lista=tab==='mp'?mSaidaMP:mSaidaP;
   document.getElementById('mov-motivo').innerHTML=lista.map(m=>`<option>${m}</option>`).join('');
 }
+// Produto com cores: a movimentacao e feita numa cor especifica
+function popularCoresMov(){
+  const wrap=document.getElementById('mov-cor-wrap'), sel=document.getElementById('mov-cor'); if(!wrap||!sel) return;
+  const tab=document.getElementById('mov-tabela').value;
+  const p=tab==='produto'?produtos.find(i=>i.id===Number(document.getElementById('mov-item').value)):null;
+  const cores=coresDe(p);
+  wrap.style.display=cores.length?'block':'none';
+  sel.innerHTML=cores.map(c=>`<option value="${String(c.nome).replace(/"/g,'&quot;')}">${c.nome} (estoque: ${c.qtd})</option>`).join('');
+}
 function checkEstoque(){
   const tab=document.getElementById('mov-tabela').value;
   const tipo=document.getElementById('mov-tipo').value;
@@ -2296,7 +2353,9 @@ function checkEstoque(){
   const qtd=Number(document.getElementById('mov-qtd').value);
   const lista=tab==='mp'?materias:produtos;
   const item=lista.find(i=>i.id===itemId);
-  document.getElementById('mov-aviso').style.display=(item&&tipo==='saida'&&qtd>item.qtd)?'block':'none';
+  let disponivel=item?item.qtd:0;
+  if(item && tab==='produto' && coresDe(item).length){ const c=coresDe(item).find(x=>x.nome===document.getElementById('mov-cor').value); disponivel=c?Number(c.qtd)||0:0; }
+  document.getElementById('mov-aviso').style.display=(item&&tipo==='saida'&&qtd>disponivel)?'block':'none';
 }
 function abrirModalMov(prefTab){
   document.getElementById('mov-tabela').value=prefTab||'produto';
@@ -2310,7 +2369,7 @@ function abrirModalMovPrefill(tab,itemId,tipo){
   document.getElementById('mov-tabela').value=tab;
   document.getElementById('mov-tipo').value=tipo;
   popularItens();
-  document.getElementById('mov-item').value=itemId;
+  document.getElementById('mov-item').value=itemId; popularCoresMov();
   popularMotivos();
   document.getElementById('mov-qtd').value='';
   document.getElementById('mov-pedido').value='';
@@ -2328,20 +2387,27 @@ async function salvarMov(){
   const lista = tab==='mp'?materias:produtos;
   const item = lista.find(i=>i.id===itemId);
   if(!item) return;
-  const novaQtd = tipo==='entrada'? item.qtd+qtd : Math.max(0,item.qtd-qtd);
+  const corMov = (tab==='produto' && coresDe(item).length) ? document.getElementById('mov-cor').value : '';
+  let novaQtd = tipo==='entrada'? item.qtd+qtd : Math.max(0,item.qtd-qtd);
+  const patchDb={qtd:novaQtd};
+  let novasCores=null;
+  if(corMov){
+    const r=ajustarCoresProduto(item, corMov, tipo==='entrada'?qtd:-qtd);
+    novasCores=r.cores; novaQtd=r.qtd; patchDb.qtd=novaQtd; patchDb.cores=novasCores;
+  }
   const tabelaDb = tab==='mp'?'materias_primas':'produtos';
   const btn=document.getElementById('btn-confirmar-mov'); btn.disabled=true;
-  const {error:errUpd} = await sb.from(tabelaDb).update({qtd:novaQtd}).eq('id',itemId);
+  const {error:errUpd} = await sb.from(tabelaDb).update(patchDb).eq('id',itemId);
   if(errUpd){ btn.disabled=false; alert('Erro: '+errUpd.message); return; }
   const {data,error} = await sb.from('movimentacoes').insert({
-    tabela:tab, tipo, item_id:itemId, nome_item:item.nome, qtd, motivo, pedido: pedido||null,
+    tabela:tab, tipo, item_id:itemId, nome_item:item.nome+(corMov?' — '+corMov:''), qtd, motivo, pedido: pedido||null,
     perfil_id: masterUid, data_mov: hojeISO()
   }).select().single();
   btn.disabled=false;
   if(error){ alert('Erro: '+error.message); return; }
   movimentacoes.unshift(movFromRow(data));
   if(tab==='mp') materias=materias.map(m=>m.id===itemId?{...m,qtd:novaQtd}:m);
-  else produtos=produtos.map(p=>p.id===itemId?{...p,qtd:novaQtd}:p);
+  else produtos=produtos.map(p=>p.id===itemId?{...p,qtd:novaQtd,...(novasCores?{cores:novasCores}:{})}:p);
   fecharModal('mov'); renderDash(); renderProd(); renderMP(); renderMov(); renderAlertas();
 }
 
@@ -3248,7 +3314,9 @@ function renderItensVenda(){
         <select onchange="selecionarProdVenda(${i},this.value)" style="border:1.5px solid var(--borda);border-radius:8px;padding:8px 10px;font-size:13px;width:100%">
           <option value="">Selecione...</option>
           ${produtos.map(p=>`<option value="${p.id}"${item.id==p.id?' selected':''}>${p.nome} — ${fmtR(p.preco)}</option>`).join('')}
-        </select></div>
+        </select>
+        ${(()=>{ const cs=coresDe(produtos.find(x=>x.id==item.id)); return cs.length?`<select onchange="selecionarCorVenda(${i},this.value)" style="margin-top:4px;border:1.5px solid ${item.cor?'var(--borda)':'#F59E0B'};border-radius:8px;padding:7px 10px;font-size:13px;width:100%"><option value="">Cor...</option>${cs.map(c=>`<option value="${String(c.nome).replace(/"/g,'&quot;')}"${item.cor===c.nome?' selected':''}>${c.nome} — ${Number(c.qtd)>0?c.qtd+' em estoque':'sem estoque'}</option>`).join('')}</select>`:''; })()}
+        </div>
       <div class="field" style="margin:0">${i===0?'<label>Qtd</label>':''}
         <input type="number" min="1" value="${item.qtd}" onchange="atualizarQtdVenda(${i},this.value)" style="border:1.5px solid var(--borda);border-radius:8px;padding:8px;font-size:13px;width:100%"></div>
       <div class="field" style="margin:0">${i===0?'<label>Preço Unit.</label>':''}
@@ -3264,6 +3332,13 @@ function selecionarProdVenda(i,pid){
   const p=produtos.find(x=>x.id==pid);
   if(p) itensVendaTemp[i]={id:p.id,nome:p.nome,qtd:itensVendaTemp[i].qtd||1,preco:p.preco};
   else itensVendaTemp[i]={id:'',nome:'',qtd:1,preco:0};
+  if(p && coresDe(p).length===1){ itensVendaTemp[i].cor=coresDe(p)[0].nome; itensVendaTemp[i].nome=p.nome+' — '+itensVendaTemp[i].cor; }
+  renderItensVenda();
+}
+function selecionarCorVenda(i,cor){
+  const p=produtos.find(x=>x.id==itensVendaTemp[i].id); if(!p) return;
+  itensVendaTemp[i].cor=cor||undefined;
+  itensVendaTemp[i].nome=cor?p.nome+' — '+cor:p.nome;
   renderItensVenda();
 }
 function atualizarQtdVenda(i,v){ itensVendaTemp[i].qtd=Math.max(1,Number(v)); renderItensVenda(); }
@@ -3273,9 +3348,13 @@ async function ajustarEstoqueVenda(itens, sinal){
   for(const item of itens){
     const p = produtos.find(x=>x.id==item.id);
     if(!p) continue;
-    const novaQtd = Math.max(0, p.qtd + sinal*item.qtd);
-    await sb.from('produtos').update({qtd:novaQtd}).eq('id',p.id);
-    produtos = produtos.map(x=>x.id===p.id?{...x,qtd:novaQtd}:x);
+    let novaQtd = Math.max(0, p.qtd + sinal*item.qtd);
+    const patch={qtd:novaQtd}; let cores=null;
+    if(item.cor && coresDe(p).some(c=>c.nome===item.cor)){
+      const r=ajustarCoresProduto(p, item.cor, sinal*item.qtd); cores=r.cores; novaQtd=r.qtd; patch.qtd=novaQtd; patch.cores=cores;
+    }
+    await sb.from('produtos').update(patch).eq('id',p.id);
+    produtos = produtos.map(x=>x.id===p.id?{...x,qtd:novaQtd,...(cores?{cores}:{})}:x);
   }
 }
 async function salvarVenda(){
@@ -3283,6 +3362,7 @@ async function salvarVenda(){
   if(!cliente){ alert('Informe o nome do cliente.'); return; }
   const itensFiltrados=itensVendaTemp.filter(i=>i.id);
   if(!itensFiltrados.length){ alert('Adicione pelo menos um produto.'); return; }
+  if(!editandoVenda){ const semCor=itensFiltrados.find(i=>coresDe(produtos.find(p=>p.id==i.id)).length && !i.cor); if(semCor){ alert('Escolha a cor do produto "'+semCor.nome+'".'); return; } }
   const dataISO=document.getElementById('v-data').value;
   const previsaoISO=document.getElementById('v-previsao').value;
   const subtotal=itensFiltrados.reduce((a,i)=>a+i.qtd*i.preco,0);
