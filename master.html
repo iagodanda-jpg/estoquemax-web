@@ -1200,10 +1200,7 @@
           <button class="btn btn-success btn-sm" onclick="salvarVendedora()">Salvar Vendedora</button>
         </div>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap">
-        <div style="font-weight:700;font-size:13px;color:var(--sub)">Vendedoras Cadastradas</div>
-        <button class="btn btn-sm btn-ghost" onclick="definirMetaParaTodas()">Definir meta mensal para todas</button>
-      </div>
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:var(--sub)">Vendedoras Cadastradas</div>
       <div id="lista-vendedoras-modal"></div>
       <div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn btn-primary" onclick="fecharModal('vendedoras')">Fechar</button></div>
     </div>
@@ -2171,25 +2168,25 @@ function renderListaVendedorasModal(){
       <div style="font-size:12px;color:var(--sub)">${v.tel||''}${v.email?' · '+v.email:''} · Comissão: <b>${v.comissao}%</b>${v.meta_mensal>0?' · Meta: <b>'+fmtR(v.meta_mensal)+'</b>':''}</div></div>
       <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
         ${v.perfil_id?`<span class="badge badge-verde">Login ativo</span><button class="btn btn-sm btn-ghost" onclick="alterarAcessoVendedora(${v.id})">Alterar acesso</button>`:`<button class="btn btn-sm" style="background:#DBEAFE;color:#1E40AF;border:1px solid #93C5FD" onclick="criarAcessoVendedora(${v.id})">Criar acesso</button>`}
+        <button class="btn btn-sm" style="background:#EDE9FE;color:#5B21B6;border:1.5px solid #C4B5FD" onclick="definirMetaVendedora(${v.id})">Meta</button>
         <button class="btn btn-sm btn-ghost" onclick="editarVendedoraModal(${v.id})">Editar</button>
         <button class="btn btn-sm" style="background:${vendedoraAtiva(v)?'#FEF3C7;color:#92400E;border:1.5px solid #FCD34D':'#DCFCE7;color:#166534;border:1.5px solid #86EFAC'}" onclick="alternarAtivoVendedora(${v.id})">${vendedoraAtiva(v)?'Inativar':'Reativar'}</button>
         <button class="btn btn-sm" style="background:none;border:1.5px solid var(--borda)" onclick="excluirVendedoraModal(${v.id})">Excluir</button>
       </div>
     </div>`).join('');
 }
-async function definirMetaParaTodas(){
-  const ativas=vendedoras.filter(vendedoraAtiva);
-  if(!ativas.length){ alert('Nenhuma vendedora ativa.'); return; }
-  const txt=prompt(`Meta mensal de vendas (R$) para as ${ativas.length} vendedoras ativas.\nIsso substitui a meta atual de cada uma:`,'');
+async function definirMetaVendedora(id){
+  const v=vendedoras.find(x=>x.id===id); if(!v) return;
+  const atual=v.meta_mensal>0?String(v.meta_mensal).replace('.',','):'';
+  const txt=prompt(`Meta mensal de vendas (R$) de ${v.nome}.\nDeixe em branco (ou 0) para remover a meta dela:`,atual);
   if(txt===null) return;
-  const meta=Number(String(txt).replace(/\./g,'').replace(',','.'));
+  const meta=txt.trim()===''?0:Number(String(txt).replace(/\./g,'').replace(',','.'));
   if(!(meta>=0)){ alert('Valor inválido.'); return; }
-  const {data,error}=await sb.from('vendedoras').update({meta_mensal:meta}).in('id',ativas.map(v=>v.id)).select('id');
+  const {data,error}=await sb.from('vendedoras').update({meta_mensal:meta}).eq('id',id).select('id');
   if(error){ alert('Erro: '+error.message); return; }
-  const ids=new Set((data||[]).map(x=>x.id));
-  vendedoras=vendedoras.map(v=>ids.has(v.id)?{...v,meta_mensal:meta}:v);
+  if(!data||!data.length){ alert('Não foi possível salvar: falta permissão no banco (RLS).'); return; }
+  vendedoras=vendedoras.map(x=>x.id===id?{...x,meta_mensal:meta}:x);
   renderListaVendedorasModal();
-  alert(`Meta de ${fmtR(meta)} definida para ${ids.size} vendedora(s).`);
 }
 function vendedoraAtiva(v){ return v.ativo!==false ? 1 : 0; }
 async function alternarAtivoVendedora(id){
