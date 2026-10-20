@@ -98,6 +98,7 @@
     <!-- INÍCIO -->
     <div id="ab-i" class="ab at">
       <div id="meta-box"></div>
+      <div id="camp-box"></div>
       <div class="fi" style="margin-bottom:10px"><label>Comissão do mês</label><select id="com-mes" onchange="cD()"></select></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px" id="kg"></div>
       <div class="ca">
@@ -537,6 +538,44 @@ async function carregarEntregasVend(){
 }
 
 // ─── INÍCIO / DASHBOARD ───────────────────────────────────────────────────────
+// Campanhas/promocoes ativas (ranking e metas com bonificacao). O placar vem de funcoes do banco que
+// devolvem so totais por vendedora - a vendedora nao enxerga as vendas das colegas.
+async function renderCampanhasVend(){
+  const box=document.getElementById('camp-box'); if(!box) return;
+  const hoje=hojeISO();
+  const {data:cs,error}=await sb.from('campanhas').select('*').gte('data_fim',hoje).order('data_inicio');
+  if(error||!cs||!cs.length){ box.innerHTML=''; return; }
+  const medalha=['🥇','🥈','🥉'];
+  const cards=[];
+  for(const c of cs){
+    const futura=hoje<c.data_inicio;
+    const periodo=new Date(c.data_inicio+'T12:00:00').toLocaleDateString('pt-BR')+' a '+new Date(c.data_fim+'T12:00:00').toLocaleDateString('pt-BR');
+    let corpo='';
+    if(futura){ corpo=`<div style="font-size:12.5px;color:var(--sub)">Começa em ${new Date(c.data_inicio+'T12:00:00').toLocaleDateString('pt-BR')}.</div>`; }
+    else {
+      const [{data:placar},{data:lojaTotal}]=await Promise.all([sb.rpc('placar_campanha',{p_inicio:c.data_inicio,p_fim:c.data_fim}), sb.rpc('total_loja',{p_inicio:c.data_inicio,p_fim:c.data_fim})]);
+      const rows=(placar||[]).map(r=>({id:r.vendedora_id,nome:r.nome,total:Number(r.total)})).sort((a,b)=>b.total-a.total||a.nome.localeCompare(b.nome));
+      const minha=rows.find(r=>r.id===vid), pos=rows.findIndex(r=>r.id===vid)+1;
+      if(c.tipo==='ranking'){
+        const metaLoja=Number(c.meta_loja)||0, loja=Number(lojaTotal)||0, ok=metaLoja<=0||loja>=metaLoja;
+        const pr=[c.premio_1,c.premio_2,c.premio_3];
+        const linha=(r,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-radius:8px;margin-bottom:4px;background:${r.id===vid?'#DBEAFE':'#fff'};border:1px solid ${r.id===vid?'#93C5FD':'var(--borda)'};font-size:13px"><span>${i<3?medalha[i]:(i+1)+'º'} <b>${r.nome}${r.id===vid?' (você)':''}</b>${i<3&&pr[i]?` <span style="font-size:11px;color:var(--verde);font-weight:700">· ${pr[i]}</span>`:''}</span><b>${fR(r.total)}</b></div>`;
+        const top=rows.slice(0,3).map(linha).join('');
+        const euFora=(minha&&pos>3)?linha(minha,pos-1):'';
+        corpo=(metaLoja>0?`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span>Meta da loja: <b>${fR(metaLoja)}</b></span><span>Loja vendeu: <b>${fR(loja)}</b></span></div><div style="background:#E5E7EB;border-radius:8px;height:12px;overflow:hidden"><div style="width:${Math.min(100,loja/metaLoja*100)}%;height:100%;background:${ok?'#1A7A4A':'#F59E0B'}"></div></div><div style="font-size:11.5px;margin-top:3px;font-weight:700;color:${ok?'var(--verde)':'var(--am)'}">${ok?'✅ Meta da loja atingida — premiação liberada':'Faltam '+fR(metaLoja-loja)+' para liberar a premiação'}</div></div>`:'')
+          +(minha?`<div style="font-size:13px;margin-bottom:8px">Sua posição: <b style="color:var(--azul)">${pos}º lugar</b> com ${fR(minha.total)}</div>`:'')
+          +(top||'<div style="font-size:12.5px;color:var(--sub)">Ainda sem vendas no período.</div>')+euFora;
+      } else {
+        const meta=Number(c.meta_individual)||0, v=minha?minha.total:0, bateu=meta>0&&v>=meta;
+        corpo=`<div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px"><span>Sua meta: <b>${fR(meta)}</b></span><span>Você vendeu: <b>${fR(v)}</b></span></div>
+          <div style="background:#E5E7EB;border-radius:10px;height:18px;overflow:hidden;position:relative"><div style="width:${meta>0?Math.min(100,v/meta*100):0}%;height:100%;background:${bateu?'#1A7A4A':'#2E6BC4'}"></div><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#1A2540">${meta>0?Math.round(v/meta*100):0}%</div></div>
+          <div style="font-size:12.5px;margin-top:6px;font-weight:700;color:${bateu?'var(--verde)':'var(--sub)'}">${bateu?'🎉 Você bateu a meta! Bonificação: '+(c.premio_meta||''):'Faltam '+fR(Math.max(0,meta-v))+' para ganhar: '+(c.premio_meta||'bonificação')}</div>`;
+      }
+    }
+    cards.push(`<div class="ca" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px"><b>${c.tipo==='ranking'?'🏆':'🎯'} ${c.nome}</b><span style="font-size:11.5px;color:var(--sub)">${periodo}</span></div>${corpo}${c.obs?`<div style="font-size:11.5px;color:var(--sub);margin-top:8px">${c.obs}</div>`:''}</div>`);
+  }
+  box.innerHTML=cards.join('');
+}
 // Meta do mes: progresso (vendas do mes, sem canceladas) + meta do dia (o que falta / dias restantes)
 function renderMeta(ativas){
   const box=document.getElementById('meta-box'); if(!box) return;
@@ -581,6 +620,7 @@ async function cD(){
   const entregues=ativas.filter(v=>v.status==='entregue');
   const aguardando=ativas.filter(v=>v.status!=='entregue');
   renderMeta(ativas);
+  renderCampanhasVend().catch(()=>{});
   const selMes=document.getElementById('com-mes');
   if(!selMes.options.length){
     const hoje=new Date();

@@ -300,6 +300,10 @@
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       Funcionários
     </button>
+    <button onclick="irAba('campanhas')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>
+      Campanhas
+    </button>
     <div class="sidebar-sep"></div>
     <button onclick="irAba('produtos')">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
@@ -700,6 +704,18 @@
     </div>
   </div>
 
+  <!-- CAMPANHAS -->
+  <div id="aba-campanhas" class="aba">
+    <div class="toolbar">
+      <div style="font-size:12.5px;color:var(--sub);flex:1;min-width:220px">Promoções e bonificações da semana/mês. Contam as vendas do período (sem canceladas). No ranking só entram vendedoras ativas com comissão acima de 0% (a "Tráfego Pago" não disputa); a meta da loja soma todas as vendas.</div>
+      <button class="btn btn-success" onclick="abrirModalCampanha()" style="display:flex;align-items:center;gap:6px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nova Campanha
+      </button>
+    </div>
+    <div id="lista-campanhas"></div>
+  </div>
+
   <!-- EXPORTAR PDF -->
   <div id="aba-exportar" class="aba">
     <div style="margin-bottom:18px">
@@ -873,6 +889,41 @@
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
         <button class="btn btn-ghost" onclick="fecharModal('fornecedor')">Cancelar</button>
         <button class="btn btn-success" id="btn-salvar-fornecedor" onclick="salvarFornecedor()">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CAMPANHA -->
+<div class="overlay" id="modal-campanha">
+  <div class="modal">
+    <div class="modal-header"><h2 id="modal-campanha-titulo">Nova Campanha</h2><button onclick="fecharModal('campanha')">&times;</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Nome da campanha</label><input id="camp-nome" placeholder="Ex: Semana do Desafio"></div>
+      <div class="field"><label>Tipo</label>
+        <select id="camp-tipo" onchange="toggleTipoCampanha()">
+          <option value="ranking">Ranking (1º, 2º e 3º lugar)</option>
+          <option value="meta">Meta (quem bater a meta ganha)</option>
+        </select>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Início</label><input id="camp-inicio" type="date"></div>
+        <div class="field"><label>Fim</label><input id="camp-fim" type="date"></div>
+      </div>
+      <div id="camp-bloco-ranking">
+        <div class="field"><label>Meta da loja (R$) — o ranking só vale se a loja vender isso (0 = sem condição)</label><input id="camp-meta-loja" type="number" min="0" step="100" placeholder="Ex: 50000"></div>
+        <div class="field"><label>Bonificação do 1º lugar</label><input id="camp-p1" placeholder="Ex: R$ 300"></div>
+        <div class="field"><label>Bonificação do 2º lugar</label><input id="camp-p2" placeholder="Ex: R$ 200"></div>
+        <div class="field"><label>Bonificação do 3º lugar</label><input id="camp-p3" placeholder="Ex: R$ 100"></div>
+      </div>
+      <div id="camp-bloco-meta" style="display:none">
+        <div class="field"><label>Meta de cada vendedora no período (R$)</label><input id="camp-meta-ind" type="number" min="0" step="100" placeholder="Ex: 8000"></div>
+        <div class="field"><label>Bonificação de quem bater a meta</label><input id="camp-premio-meta" placeholder="Ex: R$ 150"></div>
+      </div>
+      <div class="field"><label>Observações (aparece pras vendedoras)</label><input id="camp-obs" placeholder="Regras, detalhes..."></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+        <button class="btn btn-ghost" onclick="fecharModal('campanha')">Cancelar</button>
+        <button class="btn btn-success" id="btn-salvar-campanha" onclick="salvarCampanha()">Salvar</button>
       </div>
     </div>
   </div>
@@ -1465,11 +1516,15 @@ async function carregarTudo(){
     const fu = await sb.from('funcionarios').select('*').order('nome');
     funcionarios = fu.data||[];
   } catch(e){ funcionarios = []; }
+  try{
+    const ca = await sb.from('campanhas').select('*').order('data_inicio',{ascending:false});
+    campanhas = ca.data||[];
+  } catch(e){ campanhas = []; }
   empresaLogoBase64 = empresa.logoUrl ? await carregarLogoBase64(empresa.logoUrl) : null;
 }
 
 // ─── SIDEBAR / NAVEGAÇÃO ──────────────────────────────────────────────────────
-const NOMES_ABAS = { dashboard:'Dashboard', vendas:'Vendas', orcamentos:'Orçamentos', entregas:'Entregas', posvenda:'Pós-venda', funcionarios:'Funcionários', produtos:'Produtos', materias:'Matérias-Primas', fornecedores:'Fornecedores', alertas:'Alertas', exportar:'Exportar PDF', backup:'Backup' };
+const NOMES_ABAS = { dashboard:'Dashboard', vendas:'Vendas', orcamentos:'Orçamentos', entregas:'Entregas', posvenda:'Pós-venda', funcionarios:'Funcionários', campanhas:'Campanhas', produtos:'Produtos', materias:'Matérias-Primas', fornecedores:'Fornecedores', alertas:'Alertas', exportar:'Exportar PDF', backup:'Backup' };
 function abrirSidebar(){ document.getElementById('sidebar').classList.add('open'); document.getElementById('sidebar-overlay').classList.add('show'); }
 function fecharSidebar(){ document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebar-overlay').classList.remove('show'); }
 function irAba(id){
@@ -1488,6 +1543,7 @@ function irAba(id){
   if(id==='alertas') renderAlertas();
   if(id==='posvenda') renderPosVendas();
   if(id==='funcionarios') renderFuncionarios();
+  if(id==='campanhas') renderCampanhas();
   fecharSidebar();
 }
 function fecharModal(id){ document.getElementById('modal-'+id).classList.remove('open'); }
@@ -1832,6 +1888,144 @@ async function excluirFornecedor(id){
   if(error){ alert('Erro: '+error.message); return; }
   if(!apagados || !apagados.length){ alert('Fornecedor não excluído: falta permissão no banco (RLS).'); return; }
   fornecedores=fornecedores.filter(f=>f.id!==id); renderFornecedores(); renderMP(); renderAlertas();
+}
+
+// ─── CAMPANHAS / BONIFICAÇÕES ────────────────────────────────────────────────
+let campanhas = [];
+let editandoCampanha = null;
+function statusCampanha(c){
+  const h=hojeISO();
+  if(c.ativo===false) return {k:'pausada',t:'Pausada',cls:'badge-cinza'};
+  if(h<c.data_inicio) return {k:'futura',t:'Começa em '+fmtDataBR(c.data_inicio),cls:'badge-azul'};
+  if(h>c.data_fim) return {k:'encerrada',t:'Encerrada',cls:'badge-cinza'};
+  return {k:'andamento',t:'Em andamento',cls:'badge-verde'};
+}
+// Vendas do periodo (sem canceladas); ranking so com vendedoras ativas e comissao > 0
+function calcCampanha(c){
+  const base=vendas.filter(v=>v.status!=='cancelado' && v.dataISO>=c.data_inicio && v.dataISO<=c.data_fim);
+  const lojaTotal=base.reduce((a,v)=>a+v.total,0);
+  const rows=vendedoras.filter(v=>vendedoraAtiva(v) && Number(v.comissao)>0).map(vd=>{
+    const vs=base.filter(v=>v.vendedoraId==vd.id);
+    return {id:vd.id,nome:vd.nome,total:vs.reduce((a,v)=>a+v.total,0),qtd:vs.length};
+  }).sort((a,b)=>b.total-a.total||a.nome.localeCompare(b.nome));
+  const metaLoja=Number(c.meta_loja)||0;
+  return {lojaTotal,rows,condicaoOk:metaLoja<=0||lojaTotal>=metaLoja};
+}
+function barraCampanha(valor,meta,cor){
+  const pct=meta>0?Math.min(100,valor/meta*100):0;
+  return `<div style="background:#E5E7EB;border-radius:8px;height:14px;overflow:hidden;position:relative"><div style="width:${pct}%;height:100%;background:${cor};border-radius:8px"></div></div>`;
+}
+function renderCampanhas(){
+  const el=document.getElementById('lista-campanhas'); if(!el) return;
+  if(!campanhas.length){ el.innerHTML='<div class="card" style="text-align:center;padding:36px;color:var(--sub)">Nenhuma campanha cadastrada. Clique em <b>Nova Campanha</b> para criar uma promoção com bonificação.</div>'; return; }
+  const ordem={andamento:0,futura:1,pausada:2,encerrada:3};
+  const lista=campanhas.slice().sort((a,b)=>(ordem[statusCampanha(a).k]-ordem[statusCampanha(b).k])||b.data_inicio.localeCompare(a.data_inicio));
+  const medalha=['🥇','🥈','🥉'];
+  el.innerHTML=lista.map(c=>{
+    const st=statusCampanha(c), calc=calcCampanha(c), metaLoja=Number(c.meta_loja)||0;
+    let corpo='';
+    if(c.tipo==='ranking'){
+      const premios=[c.premio_1,c.premio_2,c.premio_3];
+      const cond = metaLoja>0 ? `<div style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px"><span>Meta da loja: <b>${fmtR(metaLoja)}</b></span><span>Vendido pela loja: <b>${fmtR(calc.lojaTotal)}</b> (${Math.round(calc.lojaTotal/metaLoja*100)}%)</span></div>
+          ${barraCampanha(calc.lojaTotal,metaLoja,calc.condicaoOk?'#1A7A4A':'#F59E0B')}
+          <div style="font-size:12px;margin-top:4px;color:${calc.condicaoOk?'var(--verde)':'var(--am)'};font-weight:700">${calc.condicaoOk?'✅ Meta da loja atingida — premiação liberada':'Falta '+fmtR(metaLoja-calc.lojaTotal)+' para liberar a premiação'}</div>
+        </div>` : `<div style="font-size:12.5px;margin-bottom:10px;color:var(--sub)">Vendido pela loja no período: <b>${fmtR(calc.lojaTotal)}</b> · sem meta mínima da loja</div>`;
+      const linhas=calc.rows.map((r,i)=>`<tr${i<3&&r.total>0?' style="background:#FEFCE8"':''}><td style="width:42px;text-align:center;font-size:16px">${i<3?medalha[i]:(i+1)+'º'}</td><td><b>${r.nome}</b></td><td style="text-align:right">${r.qtd} venda(s)</td><td style="text-align:right"><b>${fmtR(r.total)}</b></td><td>${i<3&&premios[i]?(r.total>0?`<span class="badge ${calc.condicaoOk?'badge-verde':'badge-am'}">${premios[i]}${calc.condicaoOk?'':' (aguarda meta da loja)'}</span>`:''):''}</td></tr>`).join('');
+      corpo=cond+`<div class="tbl-wrap" style="border-radius:10px"><table><thead><tr><th></th><th>Vendedora</th><th style="text-align:right">Vendas</th><th style="text-align:right">Total vendido</th><th>Bonificação</th></tr></thead><tbody>${linhas||'<tr><td colspan="5" class="sem-dados">Sem vendas no período.</td></tr>'}</tbody></table></div>
+        <div style="font-size:12px;color:var(--sub);margin-top:8px">Prêmios: 🥇 ${c.premio_1||'—'} · 🥈 ${c.premio_2||'—'} · 🥉 ${c.premio_3||'—'}</div>`;
+    } else {
+      const meta=Number(c.meta_individual)||0;
+      const linhas=calc.rows.slice().sort((a,b)=>b.total-a.total).map(r=>{
+        const bateu=meta>0&&r.total>=meta;
+        return `<tr${bateu?' style="background:#F0FDF4"':''}><td><b>${r.nome}</b></td><td style="min-width:150px">${barraCampanha(r.total,meta,bateu?'#1A7A4A':'#2E6BC4')}</td><td style="text-align:right">${meta>0?Math.round(r.total/meta*100):0}%</td><td style="text-align:right"><b>${fmtR(r.total)}</b></td><td>${bateu?`<span class="badge badge-verde">🎉 ${c.premio_meta||'Bateu a meta'}</span>`:`<span style="font-size:12px;color:var(--sub)">falta ${fmtR(Math.max(0,meta-r.total))}</span>`}</td></tr>`;
+      }).join('');
+      const qtdBateu=calc.rows.filter(r=>meta>0&&r.total>=meta).length;
+      corpo=`<div style="font-size:12.5px;margin-bottom:10px">Meta de cada vendedora: <b>${fmtR(meta)}</b> · Bonificação: <b>${c.premio_meta||'—'}</b> · Bateram a meta: <b>${qtdBateu}</b> de ${calc.rows.length}</div>
+        <div class="tbl-wrap" style="border-radius:10px"><table><thead><tr><th>Vendedora</th><th>Progresso</th><th style="text-align:right">%</th><th style="text-align:right">Vendido</th><th>Situação</th></tr></thead><tbody>${linhas}</tbody></table></div>`;
+    }
+    return `<div class="card" style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        <div><div style="font-weight:800;font-size:16px">${c.nome}</div>
+          <div style="font-size:12.5px;color:var(--sub);margin-top:3px">${c.tipo==='ranking'?'🏆 Ranking':'🎯 Meta'} · ${fmtDataBR(c.data_inicio)} a ${fmtDataBR(c.data_fim)} · ${badge(st.t,st.cls)}</div>
+          ${c.obs?`<div style="font-size:12px;color:var(--sub);margin-top:3px">${c.obs}</div>`:''}</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm btn-ghost" onclick="alternarAtivoCampanha(${c.id})">${c.ativo===false?'Reativar':'Pausar'}</button>
+          <button class="btn btn-sm btn-ghost" onclick="editarCampanha(${c.id})">Editar</button>
+          <button class="btn btn-sm" style="background:none;border:1.5px solid var(--borda)" onclick="excluirCampanha(${c.id})">Excluir</button>
+        </div>
+      </div>${corpo}</div>`;
+  }).join('');
+}
+function toggleTipoCampanha(){
+  const r=document.getElementById('camp-tipo').value==='ranking';
+  document.getElementById('camp-bloco-ranking').style.display=r?'block':'none';
+  document.getElementById('camp-bloco-meta').style.display=r?'none':'block';
+}
+function abrirModalCampanha(){
+  editandoCampanha=null;
+  document.getElementById('modal-campanha-titulo').textContent='Nova Campanha';
+  ['camp-nome','camp-meta-loja','camp-p1','camp-p2','camp-p3','camp-meta-ind','camp-premio-meta','camp-obs'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('camp-tipo').value='ranking';
+  const h=new Date(), dow=h.getDay(); // semana atual: domingo a sabado
+  const ini=new Date(h); ini.setDate(h.getDate()-dow); const fim=new Date(ini); fim.setDate(ini.getDate()+6);
+  document.getElementById('camp-inicio').value=isoLocal(ini); document.getElementById('camp-fim').value=isoLocal(fim);
+  toggleTipoCampanha();
+  document.getElementById('modal-campanha').classList.add('open');
+}
+function editarCampanha(id){
+  const c=campanhas.find(x=>x.id===id); if(!c) return;
+  editandoCampanha=id;
+  document.getElementById('modal-campanha-titulo').textContent='Editar Campanha';
+  document.getElementById('camp-nome').value=c.nome;
+  document.getElementById('camp-tipo').value=c.tipo;
+  document.getElementById('camp-inicio').value=c.data_inicio; document.getElementById('camp-fim').value=c.data_fim;
+  document.getElementById('camp-meta-loja').value=c.meta_loja||'';
+  document.getElementById('camp-p1').value=c.premio_1||''; document.getElementById('camp-p2').value=c.premio_2||''; document.getElementById('camp-p3').value=c.premio_3||'';
+  document.getElementById('camp-meta-ind').value=c.meta_individual||''; document.getElementById('camp-premio-meta').value=c.premio_meta||'';
+  document.getElementById('camp-obs').value=c.obs||'';
+  toggleTipoCampanha();
+  document.getElementById('modal-campanha').classList.add('open');
+}
+async function salvarCampanha(){
+  const nome=document.getElementById('camp-nome').value.trim();
+  const ini=document.getElementById('camp-inicio').value, fim=document.getElementById('camp-fim').value;
+  if(!nome||!ini||!fim){ alert('Informe o nome e as datas de início e fim.'); return; }
+  if(fim<ini){ alert('A data final não pode ser antes da inicial.'); return; }
+  const tipo=document.getElementById('camp-tipo').value;
+  if(tipo==='meta' && !(Number(document.getElementById('camp-meta-ind').value)>0)){ alert('Informe a meta de cada vendedora.'); return; }
+  const obj={ nome, tipo, data_inicio:ini, data_fim:fim,
+    meta_loja: tipo==='ranking'?(Number(document.getElementById('camp-meta-loja').value)||0):0,
+    premio_1: tipo==='ranking'?document.getElementById('camp-p1').value:null, premio_2: tipo==='ranking'?document.getElementById('camp-p2').value:null, premio_3: tipo==='ranking'?document.getElementById('camp-p3').value:null,
+    meta_individual: tipo==='meta'?(Number(document.getElementById('camp-meta-ind').value)||0):0,
+    premio_meta: tipo==='meta'?document.getElementById('camp-premio-meta').value:null,
+    obs: document.getElementById('camp-obs').value };
+  const btn=document.getElementById('btn-salvar-campanha'); btn.disabled=true;
+  if(editandoCampanha){
+    const {data,error}=await sb.from('campanhas').update(obj).eq('id',editandoCampanha).select().single();
+    btn.disabled=false; if(error){ alert('Erro: '+error.message); return; }
+    campanhas=campanhas.map(c=>c.id===editandoCampanha?data:c);
+  } else {
+    const {data,error}=await sb.from('campanhas').insert({...obj,ativo:true}).select().single();
+    btn.disabled=false; if(error){ alert('Erro: '+error.message); return; }
+    campanhas.push(data);
+  }
+  fecharModal('campanha'); renderCampanhas();
+}
+async function alternarAtivoCampanha(id){
+  const c=campanhas.find(x=>x.id===id); if(!c) return;
+  const novo=c.ativo===false;
+  const {data,error}=await sb.from('campanhas').update({ativo:novo}).eq('id',id).select('id');
+  if(error){ alert('Erro: '+error.message); return; }
+  if(!data||!data.length){ alert('Não foi possível alterar: falta permissão no banco (RLS).'); return; }
+  campanhas=campanhas.map(x=>x.id===id?{...x,ativo:novo}:x); renderCampanhas();
+}
+async function excluirCampanha(id){
+  if(!confirm('Excluir esta campanha?')) return;
+  const {data,error}=await sb.from('campanhas').delete().eq('id',id).select('id');
+  if(error){ alert('Erro: '+error.message); return; }
+  if(!data||!data.length){ alert('Campanha não excluída: falta permissão no banco (RLS).'); return; }
+  campanhas=campanhas.filter(c=>c.id!==id); renderCampanhas();
 }
 
 // ─── FUNCIONÁRIOS CRUD ────────────────────────────────────────────────────────
