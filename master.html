@@ -2160,19 +2160,35 @@ async function excluirVendedoraModal(id){
 function renderListaVendedorasModal(){
   const el=document.getElementById('lista-vendedoras-modal');
   if(!vendedoras.length){ el.innerHTML=`<div style="text-align:center;padding:20px;color:var(--sub)">Nenhuma vendedora cadastrada.</div>`; return; }
-  el.innerHTML=vendedoras.map(v=>`
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#fff;border:1.5px solid var(--borda);border-radius:8px;margin-bottom:8px;gap:10px;flex-wrap:wrap">
-      <div><div style="font-weight:700">${v.nome}</div>
+  el.innerHTML=vendedoras.slice().sort((a,b)=>(vendedoraAtiva(b)-vendedoraAtiva(a))||a.nome.localeCompare(b.nome)).map(v=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:${vendedoraAtiva(v)?'#fff':'#F3F4F6'};border:1.5px solid var(--borda);border-radius:8px;margin-bottom:8px;gap:10px;flex-wrap:wrap;${vendedoraAtiva(v)?'':'opacity:.75'}">
+      <div><div style="font-weight:700">${v.nome}${vendedoraAtiva(v)?'':' <span class="badge badge-cinza">Inativa</span>'}</div>
       <div style="font-size:12px;color:var(--sub)">${v.tel||''}${v.email?' · '+v.email:''} · Comissão: <b>${v.comissao}%</b></div></div>
       <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
         ${v.perfil_id?`<span class="badge badge-verde">Login ativo</span><button class="btn btn-sm btn-ghost" onclick="alterarAcessoVendedora(${v.id})">Alterar acesso</button>`:`<button class="btn btn-sm" style="background:#DBEAFE;color:#1E40AF;border:1px solid #93C5FD" onclick="criarAcessoVendedora(${v.id})">Criar acesso</button>`}
         <button class="btn btn-sm btn-ghost" onclick="editarVendedoraModal(${v.id})">Editar</button>
+        <button class="btn btn-sm" style="background:${vendedoraAtiva(v)?'#FEF3C7;color:#92400E;border:1.5px solid #FCD34D':'#DCFCE7;color:#166534;border:1.5px solid #86EFAC'}" onclick="alternarAtivoVendedora(${v.id})">${vendedoraAtiva(v)?'Inativar':'Reativar'}</button>
         <button class="btn btn-sm" style="background:none;border:1.5px solid var(--borda)" onclick="excluirVendedoraModal(${v.id})">Excluir</button>
       </div>
     </div>`).join('');
 }
-function popularSelectVendedoras(){
-  const opts='<option value="">— Nenhuma —</option>'+vendedoras.map(v=>`<option value="${v.id}">${v.nome} (${v.comissao}%)</option>`).join('');
+function vendedoraAtiva(v){ return v.ativo!==false ? 1 : 0; }
+async function alternarAtivoVendedora(id){
+  const v=vendedoras.find(x=>x.id===id); if(!v) return;
+  const novo=!vendedoraAtiva(v);
+  const aviso = novo ? `Reativar ${v.nome}? Ela volta a poder entrar no sistema e ser escolhida em novas vendas.`
+    : `Inativar ${v.nome}?\n\n• Ela não conseguirá mais entrar no sistema.\n• Deixa de aparecer nas listas pra novas vendas.\n• O histórico de vendas e comissões dela continua normal.\n\nVocê pode reativar quando quiser.`;
+  if(!confirm(aviso)) return;
+  const {data,error}=await sb.from('vendedoras').update({ativo:novo}).eq('id',id).select('id');
+  if(error){ alert('Erro: '+error.message); return; }
+  if(!data||!data.length){ alert('Não foi possível alterar: falta permissão no banco (RLS).'); return; }
+  vendedoras=vendedoras.map(x=>x.id===id?{...x,ativo:novo}:x);
+  renderListaVendedorasModal(); popularSelectVendedoras();
+}
+// incluirId: mantem na lista uma vendedora inativa que ja esta vinculada ao registro sendo editado
+function popularSelectVendedoras(incluirId){
+  const paraEscolher=vendedoras.filter(v=>vendedoraAtiva(v)||v.id==incluirId);
+  const opts='<option value="">— Nenhuma —</option>'+paraEscolher.map(v=>`<option value="${v.id}">${v.nome}${vendedoraAtiva(v)?'':' (inativa)'} (${v.comissao}%)</option>`).join('');
   const el=document.getElementById('v-vendedora'); if(el) el.innerHTML=opts;
   const filtro=document.getElementById('filtro-venda-vendedora');
   if(filtro) filtro.innerHTML='<option value="todas">Todas as vendedoras</option>'+vendedoras.map(v=>`<option value="${v.id}">${v.nome}</option>`).join('');
@@ -2299,9 +2315,9 @@ function renderPosVendas(){
         <button class="btn btn-sm" style="background:none;border:1.5px solid var(--borda)" onclick="excluirPosVenda(${p.id})">Excluir</button>
     </div></td></tr>`).join('');
 }
-function popularSelectsPosVenda(){
+function popularSelectsPosVenda(incluirId){
   const selVend=document.getElementById('pv-vendedora');
-  if(selVend) selVend.innerHTML='<option value="">— Nenhuma —</option>'+vendedoras.map(v=>`<option value="${v.id}">${v.nome}</option>`).join('');
+  if(selVend) selVend.innerHTML='<option value="">— Nenhuma —</option>'+vendedoras.filter(v=>vendedoraAtiva(v)||v.id==incluirId).map(v=>`<option value="${v.id}">${v.nome}${vendedoraAtiva(v)?'':' (inativa)'}</option>`).join('');
 }
 function buscarVendaPosVenda(termo){
   const box=document.getElementById('sug-pv-venda'); if(!box) return;
@@ -2375,7 +2391,7 @@ function editarPosVenda(id){
   const p=posVendas.find(x=>x.id===id); if(!p) return;
   editandoPosVenda=id;
   document.getElementById('modal-posvenda-titulo').textContent='Editar Registro de Pós-venda';
-  popularSelectsPosVenda();
+  popularSelectsPosVenda(p.vendedora_id);
   document.getElementById('pv-venda').value=p.venda_id||'';
   const vOrig=p.venda_id?vendas.find(v=>v.id==p.venda_id):null;
   document.getElementById('pv-venda-busca').value=vOrig?`#${vOrig.id} – ${vOrig.cliente} (${vOrig.data})`:'';
@@ -2963,7 +2979,7 @@ function editarVenda(id){
   document.getElementById('v-desconto').value=v.descontoRaw||0;
   document.getElementById('v-desconto-modo').value=v.descontoModo||'R$';
   document.getElementById('v-desconto-obs').value=v.descontoObs||'';
-  popularSelectVendedoras();
+  popularSelectVendedoras(v.vendedoraId);
   document.getElementById('v-vendedora').value=v.vendedoraId||'';
   const temPgto2 = !!(v.pgto2 && v.valor2>0);
   document.getElementById('v-dividir-pgto').checked = temPgto2;

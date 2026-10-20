@@ -516,7 +516,8 @@ async function login(){
   const {data:p}=await sb.from('perfis').select('role,nome').eq('id',data.user.id).single();
   if(!p||p.role==='master'){ er.textContent='Use o sistema Master.'; er.style.display='block'; await sb.auth.signOut(); bl.textContent='Entrar'; bl.disabled=false; return; }
   pid=data.user.id;
-  const {data:v}=await sb.from('vendedoras').select('id,nome,comissao').eq('perfil_id',pid).single();
+  const {data:v}=await sb.from('vendedoras').select('id,nome,comissao,ativo').eq('perfil_id',pid).single();
+  if(v && v.ativo===false){ er.textContent='Seu acesso está inativo. Fale com o administrador.'; er.style.display='block'; await sb.auth.signOut(); bl.textContent='Entrar'; bl.disabled=false; return; }
   if(v){ vid=v.id; vnome=v.nome; vcomissao=Number(v.comissao||0); document.getElementById('nu').textContent=v.nome.split(' ')[0]; }
   else { vnome=p.nome; document.getElementById('nu').textContent=p.nome.split(' ')[0]; }
   const {data:e}=await sb.from('empresa').select('*').eq('id',1).maybeSingle();
@@ -1356,7 +1357,8 @@ async function gerarPosVendaPDF(pv){
     pid=session.user.id;
     const {data:p}=await sb.from('perfis').select('role,nome').eq('id',pid).single();
     if(p && p.role!=='master'){
-      const {data:v}=await sb.from('vendedoras').select('id,nome,comissao').eq('perfil_id',pid).single();
+      const {data:v}=await sb.from('vendedoras').select('id,nome,comissao,ativo').eq('perfil_id',pid).single();
+      if(v && v.ativo===false){ await sb.auth.signOut(); const er=document.getElementById('le'); er.textContent='Seu acesso está inativo. Fale com o administrador.'; er.style.display='block'; return; }
       if(v){ vid=v.id; vnome=v.nome; vcomissao=Number(v.comissao||0); document.getElementById('nu').textContent=v.nome.split(' ')[0]; }
       else { vnome=p.nome; document.getElementById('nu').textContent=p.nome.split(' ')[0]; }
       const {data:e}=await sb.from('empresa').select('*').eq('id',1).maybeSingle();
