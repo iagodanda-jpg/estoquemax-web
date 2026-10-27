@@ -77,7 +77,7 @@
       <button class="at" onclick="ir('i')" id="ni">Início</button>
       <button onclick="ir('nv')" id="nnv">Nova Venda</button>
       <button onclick="ir('mv')" id="nmv">Minhas Vendas</button>
-      <button onclick="ir('oc')" id="noc">Orçamento</button>
+      <button onclick="ir('est')" id="nest">Estoque Atual</button>
       <button onclick="ir('pv')" id="npv">Pós-venda</button>
       <button onclick="ir('cal')" id="ncal">Calendário de Entregas</button>
     </nav>
@@ -100,11 +100,11 @@
       <div id="meta-box"></div>
       <div id="camp-box"></div>
       <div class="fi" style="margin-bottom:10px"><label>Comissão do mês</label><select id="com-mes" onchange="cD()"></select></div>
+      <button class="bt bg" onclick="exportarResumoMesPDF()" id="bresumo" style="margin-bottom:10px">📄 Baixar resumo do mês (PDF)</button>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px" id="kg"></div>
       <div class="ca">
         <b style="display:block;margin-bottom:10px">Ações Rápidas</b>
         <button class="bt bs" onclick="ir('nv')">+ Nova Venda</button>
-        <button class="bt bg" onclick="ir('oc')" style="margin-bottom:0">Gerar Orçamento</button>
       </div>
       <div class="ca">
         <b style="display:block;margin-bottom:10px">Últimas Vendas</b>
@@ -193,90 +193,17 @@
     <!-- MINHAS VENDAS -->
     <div id="ab-mv" class="ab"><div id="lv"></div></div>
 
-    <!-- ORÇAMENTO -->
-    <div id="ab-oc" class="ab">
-      <div style="display:flex;gap:8px;margin-bottom:12px">
-        <button id="oc-tab-form" onclick="ocView('form')" style="flex:1;border:none;border-radius:10px;padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;background:var(--azul);color:#fff">Novo Orçamento</button>
-        <button id="oc-tab-hist" onclick="ocView('hist')" style="flex:1;border:1.5px solid var(--azul);border-radius:10px;padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;background:transparent;color:var(--azul)">Histórico</button>
+    <!-- ESTOQUE ATUAL -->
+    <div id="ab-est" class="ab">
+      <div class="ca">
+        <div class="fi"><label>Buscar produto</label><input id="est-busca" placeholder="Digite o nome..." oninput="renderEstoque()"></div>
+        <div class="row2">
+          <div class="fi" style="margin-bottom:0"><label>Tipo</label><select id="est-tipo" onchange="renderEstoque()"><option value="todos">Todos</option><option value="fabricado">Fabricados</option><option value="revenda">Revenda</option></select></div>
+          <div class="fi" style="margin-bottom:0"><label>Mostrar</label><select id="est-so" onchange="renderEstoque()"><option value="com">Só com estoque</option><option value="todos">Todos os produtos</option></select></div>
+        </div>
       </div>
-      <div id="oc-hist" style="display:none">
-        <div id="oc-hist-list"></div>
-      </div>
-      <div id="oc-form" class="ca">
-        <b style="display:block;margin-bottom:12px">Gerar Orçamento</b>
-        <div class="fi"><label>Cliente</label><input id="oc" placeholder="Nome"></div>
-        <div class="fi"><label>Telefone</label><input id="otel" placeholder="(00) 00000-0000"></div>
-        <div class="fi"><label>CPF do Cliente</label><input id="ocpf" placeholder="000.000.000-00"></div>
-
-        <div style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;margin-bottom:8px">Produtos</div>
-        <div id="ol"></div>
-        <button onclick="addO()" style="background:transparent;border:1.5px solid var(--azul);color:var(--azul);border-radius:8px;padding:8px 14px;cursor:pointer;margin-bottom:12px;font-weight:600">+ Produto</button>
-
-        <div class="fi"><label>Desconto</label>
-          <div style="display:flex;gap:6px">
-            <input id="odesc" type="number" min="0" step="0.01" placeholder="0" oninput="calcO()" style="flex:1">
-            <select id="odescmodo" onchange="calcO()" style="width:80px"><option value="R$">R$</option><option value="%">%</option></select>
-          </div>
-        </div>
-
-        <div class="fi"><label>Pagamento</label>
-          <select id="op" onchange="onPgtoChangeOrc()">
-            <option>Dinheiro</option><option>PIX</option><option>Pix Maquininha</option>
-            <option>Cartão Débito</option><option>Cartão Crédito</option><option>Link de Pagamento</option>
-            <option>Boleto</option><option>Parcelado</option>
-          </select>
-        </div>
-        <div class="maq" id="oblocomaq">
-          <div class="maq-titulo">Maquininha Stone</div>
-          <div class="row2">
-            <select id="oband" onchange="calcTaxaMaqOrc()"><option value="">Selecione...</option><option value="mastercard">Mastercard</option><option value="visa">Visa</option><option value="elo">Elo</option><option value="amex">Amex</option></select>
-            <select id="oparc" onchange="calcO()"><option value="">Parcelas</option></select>
-          </div>
-          <div class="resumo-taxa" id="oresumotaxa">
-            <div><span style="color:var(--sub)">Taxa:</span><span id="otxpct" style="font-weight:700;color:#1E40AF"></span></div>
-            <div><span style="color:var(--sub)">Valor da taxa:</span><span id="otxval" style="font-weight:700;color:var(--vm)"></span></div>
-            <div style="border-top:1px solid #E5E7EB;padding-top:6px"><span style="font-weight:700">Você recebe:</span><span id="otxliq" style="font-weight:800;color:var(--verde)"></span></div>
-          </div>
-        </div>
-
-        <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--sub);cursor:pointer;margin-bottom:10px">
-          <input type="checkbox" id="odividir" onchange="toggleDividirOrc()"> Dividir em duas formas de pagamento
-        </label>
-        <div class="maq" id="oblocomaq2" style="background:#F0FDF4;border-color:#BBF7D0">
-          <div class="maq-titulo" style="color:#166534">2ª Forma de Pagamento</div>
-          <div class="row2" style="margin-bottom:8px">
-            <select id="op2" onchange="onPgto2ChangeOrc()">
-              <option>Dinheiro</option><option>PIX</option><option>Pix Maquininha</option>
-              <option>Cartão Débito</option><option>Cartão Crédito</option><option>Link de Pagamento</option>
-              <option>Boleto</option><option>Parcelado</option>
-            </select>
-            <input id="ovalor2" type="number" min="0" step="0.01" placeholder="Valor desta forma" oninput="calcO()">
-          </div>
-          <div class="row2" id="oblocomaq2band" style="display:none">
-            <select id="oband2" onchange="calcTaxaMaqOrc2()"><option value="">Selecione...</option><option value="mastercard">Mastercard</option><option value="visa">Visa</option><option value="elo">Elo</option><option value="amex">Amex</option></select>
-            <select id="oparc2"><option value="">Parcelas</option></select>
-          </div>
-          <div style="font-size:12px;color:#166534;margin-top:6px">Valor restante na 1ª forma: <b id="ovalor1restante">R$ 0,00</b></div>
-        </div>
-
-        <div style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;margin:12px 0 8px">Endereço (opcional)</div>
-        <div class="fi"><label>Rua / Avenida</label><input id="orua" placeholder="Endereço"></div>
-        <div class="row3">
-          <div class="fi" style="margin-bottom:0"><label>Nº</label><input id="onum" placeholder="Nº"></div>
-          <div class="fi" style="margin-bottom:0"><label>Cidade</label><input id="ocid" placeholder="Cidade"></div>
-          <div class="fi" style="margin-bottom:0"><label>UF</label><input id="ouf" placeholder="UF" maxlength="2" style="text-transform:uppercase"></div>
-        </div>
-
-        <div class="fi" style="margin-top:12px"><label>Válido até</label><input id="oval" type="date"></div>
-        <div class="fi"><label>Condições / Obs</label><input id="oo" placeholder="Condições adicionais..."></div>
-
-        <div id="ores" style="background:var(--fundo);border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:14px">
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:var(--sub);font-size:13px">Subtotal:</span><span id="orsub" style="font-weight:600">R$ 0,00</span></div>
-          <div style="display:flex;justify-content:space-between"><b>Total:</b><b id="ort" style="color:var(--verde)">R$ 0,00</b></div>
-        </div>
-        <button class="bt bs" onclick="salvarOrcamento()" id="bso">Salvar Orçamento (PDF)</button>
-        <button class="bt bg" onclick="gO()" style="margin-bottom:0">Compartilhar via WhatsApp</button>
-      </div>
+      <button class="bt bp" onclick="exportarEstoquePDF()">📄 Exportar PDF do Estoque</button>
+      <div id="est-lista"></div>
     </div>
 
     <!-- PÓS-VENDA -->
@@ -338,7 +265,7 @@
 
 <script>
 const SU='https://nuqnlzmmnrrodlalijrb.supabase.co';
-let sb, prods=[], it=[{id:'',n:'',q:1,p:0}], oi=[{id:'',n:'',q:1,p:0}], pid, vid, enm='Iago Estofados', emp={}, vendasCache=[], vnome='', vcomissao=0, vmeta=0, orcamentosCache=[];
+let sb, prods=[], it=[{id:'',n:'',q:1,p:0}], pid, vid, enm='Iago Estofados', emp={}, vendasCache=[], vnome='', vcomissao=0, vmeta=0;
 let entregasVend=[], semanaOffsetVend=0;
 let empLogoBase64=null;
 async function carregarLogoBase64Vend(url){
@@ -463,8 +390,8 @@ function ir(id){
   document.getElementById('ab-'+id).classList.add('at');
   if(id==='i') cD();
   if(id==='mv') cMV();
+  if(id==='est') abrirEstoque();
   if(id==='nv'){ rI(); document.getElementById('vpr').min=hojeISO(); }
-  if(id==='oc'){ ocView('form'); rO(); if(!document.getElementById('oval').value){ const v=new Date(); v.setDate(v.getDate()+7); document.getElementById('oval').value=isoLocal(v); } }
   if(id==='pv'){ pvView('form'); if(!vendasCache.length) cMV(); }
   if(id==='cal'){ semanaOffsetVend=0; renderCalVend(); }
   fecharDrawer();
@@ -516,7 +443,7 @@ async function login(){
   const {data,error}=await sb.auth.signInWithPassword({email:usernameParaEmail(em),password:pw});
   if(error){ er.textContent='Usuário ou senha incorretos.'; er.style.display='block'; bl.textContent='Entrar'; bl.disabled=false; return; }
   const {data:p}=await sb.from('perfis').select('role,nome').eq('id',data.user.id).single();
-  if(!p||p.role==='master'){ er.textContent='Use o sistema Master.'; er.style.display='block'; await sb.auth.signOut(); bl.textContent='Entrar'; bl.disabled=false; return; }
+  if(!p||p.role!=='vendedora'){ er.textContent=(p&&p.role==='master')?'Use o sistema Master.':'Este acesso não é de vendedora.'; er.style.display='block'; await sb.auth.signOut(); bl.textContent='Entrar'; bl.disabled=false; return; }
   pid=data.user.id;
   const {data:v}=await sb.from('vendedoras').select('id,nome,comissao,ativo,meta_mensal').eq('perfil_id',pid).single();
   if(v && v.ativo===false){ er.textContent='Seu acesso está inativo. Fale com o administrador.'; er.style.display='block'; await sb.auth.signOut(); bl.textContent='Entrar'; bl.disabled=false; return; }
@@ -524,7 +451,7 @@ async function login(){
   else { vnome=p.nome; document.getElementById('nu').textContent=p.nome.split(' ')[0]; }
   const {data:e}=await sb.from('empresa').select('*').eq('id',1).maybeSingle();
   if(e){ emp=e; enm=e.nome||enm; document.getElementById('en').textContent=enm; document.getElementById('en-drawer').textContent=enm; if(e.logo_url) empLogoBase64=await carregarLogoBase64Vend(e.logo_url); }
-  const {data:prs}=await sb.from('produtos').select('id,nome,preco,qtd,cores').eq('ativo',true).order('nome');
+  const {data:prs}=await sb.from('produtos').select('id,nome,tipo,preco,qtd,cores').eq('ativo',true).order('nome');
   prods=prs||[];
   await carregarEntregasVend();
   document.getElementById('ls').style.display='none';
@@ -683,10 +610,10 @@ function buscarProduto(tipo, idx, termo){
 }
 function selecionarProduto(tipo, idx, prodId){
   const pr=prods.find(x=>x.id==prodId); if(!pr) return;
-  const arr=tipo==='it'?it:oi;
+  const arr=it;
   arr[idx]={id:pr.id,n:pr.nome,q:arr[idx].q,p:Number(pr.preco),pMin:Number(pr.preco)};
   const cs=coresP(pr); if(cs.length===1) arr[idx].cor=cs[0].nome;
-  if(tipo==='it') rI(); else rO();
+  rI();
 }
 // ─── CORES DO PRODUTO ───
 function coresP(p){ return Array.isArray(p&&p.cores)?p.cores:[]; }
@@ -696,14 +623,14 @@ function selectCor(tipo, idx, i){
   return `<select onchange="escolherCor('${tipo}',${idx},this.value)" style="margin-top:4px;border:1.5px solid ${i.cor?'var(--borda)':'#F59E0B'};border-radius:10px;padding:9px 11px;font-size:13.5px;width:100%"><option value="">Escolha a cor...</option>${cs.map(c=>{ const q=Number(c.qtd)||0; return `<option value="${String(c.nome).replace(/"/g,'&quot;')}"${i.cor===c.nome?' selected':''}>${c.nome} — ${q>0?q+' em estoque':'sem estoque'}</option>`; }).join('')}</select>`;
 }
 function escolherCor(tipo, idx, cor){
-  const arr=tipo==='it'?it:oi; arr[idx].cor=cor||undefined;
-  if(tipo==='it') rI(); else rO();
+  const arr=it; arr[idx].cor=cor||undefined;
+  rI();
 }
 function itemSemCor(arr){ return arr.find(i=>i.id && coresP(prods.find(x=>x.id==i.id)).length && !i.cor); }
 function fecharSugestoes(tipo, idx){
   setTimeout(()=>{
     const box=document.getElementById(`sug-${tipo}-${idx}`); if(box) box.style.display='none';
-    const arr=tipo==='it'?it:oi; const inp=document.getElementById(`inp-${tipo}-${idx}`);
+    const arr=it; const inp=document.getElementById(`inp-${tipo}-${idx}`);
     if(inp && arr[idx]) inp.value=arr[idx].n||'';
   }, 150);
 }
@@ -927,363 +854,146 @@ async function gerarPedidoPDF(venda, its){
   doc.save(nomeArquivo);
 }
 
-// ─── ORÇAMENTO ─────────────────────────────────────────────────────────────────
-function rO(){
-  document.getElementById('ol').innerHTML=oi.map((i,idx)=>`<div style="display:grid;grid-template-columns:1fr 50px 70px 30px;gap:6px;margin-bottom:8px;align-items:start">
-    <div style="position:relative">
-      <input type="text" id="inp-oi-${idx}" placeholder="Buscar produto..." value="${(i.n||'').replace(/"/g,'&quot;')}" oninput="buscarProduto('oi',${idx},this.value)" onfocus="this.select();buscarProduto('oi',${idx},'')" onblur="fecharSugestoes('oi',${idx})" autocomplete="off" style="border:1.5px solid var(--borda);border-radius:10px;padding:11px 13px;font-size:14px;width:100%">
-      <div id="sug-oi-${idx}" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--borda);border-radius:8px;margin-top:2px;max-height:180px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.12)"></div>
-      ${selectCor('oi',idx,i)}
-    </div>
-    <input type="number" min="1" value="${i.q}" onchange="uO(${idx},this.value)" style="text-align:center">
-    <input type="number" min="${i.pMin||0}" step="0.01" value="${i.p||0}" onchange="uOPr(${idx},this.value)" ${i.id?'':'disabled'} title="Preço unitário (mínimo: preço cadastrado)" style="text-align:center">
-    <button onclick="oi.splice(${idx},1);rO()" style="background:#FEE2E2;border:none;border-radius:8px;color:var(--vm);cursor:pointer;width:30px;height:38px">x</button>
-  </div>`).join('');
-  calcO();
-}
-function uO(i,v){ oi[i].q=Math.max(1,Number(v)); rO(); }
-function uOPr(i,v){
-  const floor=oi[i].pMin||0, val=Number(v)||0;
-  if(val<floor){ alert('O preço não pode ficar abaixo do valor cadastrado ('+fR(floor)+'). Para reduzir, use o campo Desconto.'); oi[i].p=floor; }
-  else oi[i].p=val;
-  rO();
-}
-function addO(){ oi.push({id:'',n:'',q:1,p:0}); rO(); }
-
-// ─── PAGAMENTO NO ORÇAMENTO (espelha Nova Venda) ──────────────────────────────
-function onPgtoChangeOrc(){
-  const pgto=document.getElementById('op').value;
-  const bloco=document.getElementById('oblocomaq');
-  const selBand=document.getElementById('oband');
-  const selParc=document.getElementById('oparc');
-  const usaMaq=['Pix Maquininha','Cartão Débito','Cartão Crédito','Parcelado','Link de Pagamento'].includes(pgto);
-  const isLink=pgto==='Link de Pagamento', isPix=pgto==='Pix Maquininha', isDebito=pgto==='Cartão Débito';
-  bloco.style.display=usaMaq?'block':'none';
-  if(usaMaq){
-    if(isLink){
-      selBand.innerHTML='<option value="link">Link</option>'; selBand.disabled=true; selParc.disabled=false;
-      selParc.innerHTML='<option value="">Parcelas</option>'+Object.entries(TAXAS_STONE.link).map(([n,t])=>`<option value="${n}">${n==='1'?'1x':n+'x'} — ${t.toFixed(2).replace('.',',')}%</option>`).join('');
-    } else if(isPix){
-      selBand.innerHTML='<option value="pix">Pix</option>'; selBand.disabled=true;
-      selParc.innerHTML='<option value="1">À vista</option>'; selParc.disabled=true;
-    } else {
-      selBand.disabled=false;
-      const bands = isDebito ? [['mastercard','Mastercard'],['visa','Visa'],['elo','Elo']] : [['mastercard','Mastercard'],['visa','Visa'],['elo','Elo'],['amex','Amex']];
-      selBand.innerHTML='<option value="">Selecione...</option>'+bands.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
-      popularParcelas(pgto, selBand.value, selParc);
-    }
-  }
-  calcO();
-}
-function calcTaxaMaqOrc(){
-  const pgto=document.getElementById('op').value;
-  const bandeira=document.getElementById('oband').value;
-  popularParcelas(pgto, bandeira, document.getElementById('oparc'));
-  calcO();
-}
-function toggleDividirOrc(){
-  const dividir=document.getElementById('odividir').checked;
-  document.getElementById('oblocomaq2').style.display=dividir?'block':'none';
-  if(dividir){ document.getElementById('op2').value='Dinheiro'; onPgto2ChangeOrc(); }
-  else document.getElementById('ovalor2').value='';
-  calcO();
-}
-function onPgto2ChangeOrc(){
-  const pgto=document.getElementById('op2').value;
-  const wrap=document.getElementById('oblocomaq2band');
-  const selBand=document.getElementById('oband2');
-  const selParc=document.getElementById('oparc2');
-  const usaMaq=['Pix Maquininha','Cartão Débito','Cartão Crédito','Parcelado','Link de Pagamento'].includes(pgto);
-  const isLink=pgto==='Link de Pagamento', isPix=pgto==='Pix Maquininha', isDebito=pgto==='Cartão Débito';
-  wrap.style.display=usaMaq?'grid':'none';
-  if(usaMaq){
-    if(isLink){
-      selBand.innerHTML='<option value="link">Link</option>'; selBand.disabled=true; selParc.disabled=false;
-      selParc.innerHTML='<option value="">Parcelas</option>'+Object.entries(TAXAS_STONE.link).map(([n,t])=>`<option value="${n}">${n==='1'?'1x':n+'x'} — ${t.toFixed(2).replace('.',',')}%</option>`).join('');
-    } else if(isPix){
-      selBand.innerHTML='<option value="pix">Pix</option>'; selBand.disabled=true;
-      selParc.innerHTML='<option value="1">À vista</option>'; selParc.disabled=true;
-    } else {
-      selBand.disabled=false;
-      const bands = isDebito ? [['mastercard','Mastercard'],['visa','Visa'],['elo','Elo']] : [['mastercard','Mastercard'],['visa','Visa'],['elo','Elo'],['amex','Amex']];
-      selBand.innerHTML='<option value="">Selecione...</option>'+bands.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
-      popularParcelas(pgto, selBand.value, selParc);
-    }
-  }
-  calcO();
-}
-function calcTaxaMaqOrc2(){
-  const pgto=document.getElementById('op2').value;
-  const bandeira=document.getElementById('oband2').value;
-  popularParcelas(pgto, bandeira, document.getElementById('oparc2'));
-  calcO();
-}
-function calcO(){
-  const subtotal=oi.filter(i=>i.id).reduce((a,i)=>a+i.q*i.p,0);
-  const desc=Number(document.getElementById('odesc')?.value||0);
-  const modo=document.getElementById('odescmodo')?.value||'R$';
-  const descValor=modo==='%'?subtotal*(desc/100):desc;
-  const total=Math.max(0,subtotal-descValor);
-  const subEl=document.getElementById('orsub'), totEl=document.getElementById('ort');
-  if(subEl) subEl.textContent=fR(subtotal);
-  if(totEl) totEl.textContent=fR(total);
-
-  const dividir=document.getElementById('odividir')?.checked;
-  const valor2Raw=dividir?Number(document.getElementById('ovalor2')?.value||0):0;
-  const valor2=Math.min(Math.max(0,valor2Raw),total);
-  const valor1=total-valor2;
-  const restanteEl=document.getElementById('ovalor1restante');
-  if(restanteEl) restanteEl.textContent=fR(valor1);
-
-  const pgto=document.getElementById('op')?.value||'';
-  const bandeira=document.getElementById('oband')?.value||'';
-  const parcelas=document.getElementById('oparc')?.value||'1';
-  const usaMaq=['Pix Maquininha','Cartão Débito','Cartão Crédito','Parcelado','Link de Pagamento'].includes(pgto);
-  const resumo=document.getElementById('oresumotaxa');
-  if(usaMaq && valor1>0 && (bandeira||pgto==='Pix Maquininha'||pgto==='Link de Pagamento')){
-    const taxaPct=getTaxaPct(pgto, pgto==='Pix Maquininha'?'pix':pgto==='Link de Pagamento'?'link':bandeira, parcelas);
-    const taxaValor=valor1*(taxaPct/100), liquido=valor1-taxaValor;
-    resumo.style.display='block';
-    document.getElementById('otxpct').textContent=taxaPct.toFixed(2).replace('.',',')+'%';
-    document.getElementById('otxval').textContent='-'+fR(taxaValor);
-    document.getElementById('otxliq').textContent=fR(liquido);
-  } else resumo.style.display='none';
-}
-
-function gO(){
-  const c=document.getElementById('oc').value.trim(), its=oi.filter(i=>i.id);
-  if(!c||!its.length) return alert('Informe o cliente e produtos');
-  const semCor=itemSemCor(oi); if(semCor) return alert('Escolha a cor do produto "'+semCor.n+'".');
-  const subtotal=its.reduce((a,i)=>a+i.q*i.p,0);
-  const descRaw=Number(document.getElementById('odesc').value||0);
-  const descModo=document.getElementById('odescmodo').value;
-  const descValor=descModo==='%'?subtotal*(descRaw/100):descRaw;
-  const total=Math.max(0,subtotal-descValor);
-  const hj=new Date().toLocaleDateString('pt-BR');
-  const valISO=document.getElementById('oval').value;
-  const validade=valISO?new Date(valISO+'T12:00:00').toLocaleDateString('pt-BR'):'';
-  const obs=document.getElementById('oo').value;
-  const tel=document.getElementById('otel').value;
-  const cpf=document.getElementById('ocpf').value;
-  const endTxt=[document.getElementById('orua').value,document.getElementById('onum').value,document.getElementById('ocid').value,document.getElementById('ouf').value].filter(Boolean).join(', ');
-  const pgto=document.getElementById('op').value;
-  const dividir=document.getElementById('odividir').checked;
-  const pgto2=dividir?document.getElementById('op2').value:'';
-  const valor2=dividir?Number(document.getElementById('ovalor2').value||0):0;
-  const pgtoTxt=[pgto, valor2>0?`${pgto2} (${fR(valor2)})`:''].filter(Boolean).join(' + ');
-
-  let tx=`*ORÇAMENTO — ${enm}*\n`;
-  if(emp.slogan) tx+=`_${emp.slogan}_\n`;
-  const contatoEmp=[emp.cnpj,emp.tel,emp.email].filter(Boolean).join(' · ');
-  if(contatoEmp) tx+=`${contatoEmp}\n`;
-  if(emp.endereco) tx+=`${emp.endereco}\n`;
-  tx+=`\n*Cliente:* ${c}`;
-  if(tel) tx+=`\n*Telefone:* ${tel}`;
-  if(cpf) tx+=`\n*CPF:* ${cpf}`;
-  if(endTxt) tx+=`\n*Endereço:* ${endTxt}`;
-  tx+=`\n*Data:* ${hj}\n\n`;
-  tx+=its.map(i=>`• ${i.q}x ${nomeItemCor(i)} - ${fR(i.p)} = *${fR(i.q*i.p)}*`).join('\n');
-  if(descValor>0) tx+=`\n\n_Desconto: -${fR(descValor)}_`;
-  tx+=`\n\n*TOTAL: ${fR(total)}*`;
-  tx+=`\n*Forma de pagamento:* ${pgtoTxt}`;
-  if(validade) tx+=`\n\n_Orçamento válido até ${validade}_`;
-  if(obs) tx+=`\n${obs}`;
-  window.open('https://wa.me/?text='+encodeURIComponent(tx),'_blank');
-}
-
-// ─── HISTÓRICO DE ORÇAMENTOS ───────────────────────────────────────────────────
-function ocView(v){
-  document.getElementById('oc-form').style.display = v==='form'?'block':'none';
-  document.getElementById('oc-hist').style.display = v==='hist'?'block':'none';
-  const tf=document.getElementById('oc-tab-form'), th=document.getElementById('oc-tab-hist');
-  tf.style.background = v==='form'?'var(--azul)':'transparent'; tf.style.color = v==='form'?'#fff':'var(--azul)';
-  th.style.background = v==='hist'?'var(--azul)':'transparent'; th.style.color = v==='hist'?'#fff':'var(--azul)';
-  if(v==='hist') cOH();
-}
-async function cOH(){
-  const {data:os,error}=await sb.from('orcamentos').select('*').eq('perfil_vendedora_id',pid).order('criado_em',{ascending:false});
-  if(error){ document.getElementById('oc-hist-list').innerHTML=`<div style="text-align:center;color:var(--vm);padding:30px;font-size:13px">Erro ao carregar histórico: ${error.message}</div>`; return; }
-  orcamentosCache=os||[];
-  document.getElementById('oc-hist-list').innerHTML=orcamentosCache.length?orcamentosCache.map(o=>{
-    const statusBadge = o.status==='convertido' ? `<span class="badge" style="background:#DCFCE7;color:#166534">Virou Pedido${o.venda_id?' #'+o.venda_id:''}</span>` : '<span class="badge" style="background:#FEF9C3;color:#92400E">Em aberto</span>';
-    return `<div class="vi">
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-        <div><b>${o.cliente}</b><div style="font-size:11px;color:var(--sub)">${new Date(o.criado_em).toLocaleDateString('pt-BR')}${o.validade?' · válido até '+new Date(o.validade+'T12:00:00').toLocaleDateString('pt-BR'):''}</div></div>
-        <b style="color:var(--verde)">${fR(o.total)}</b>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
-        ${statusBadge}
-        <div style="display:flex;gap:6px">
-          <button onclick="baixarOrcamentoPDF(${o.id})" style="background:#EFF6FF;border:1px solid #BFDBFE;color:#1E4D8C;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer">📄 PDF</button>
-          ${o.status!=='convertido'?`<button onclick="converterOrcamentoEmPedido(${o.id})" style="background:#DCFCE7;border:1px solid #BBF7D0;color:#166534;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer">✔ Virou Pedido</button>`:''}
-        </div>
-      </div>
-    </div>`;
-  }).join('') : '<div style="text-align:center;color:var(--sub);padding:30px">Nenhum orçamento salvo ainda</div>';
-}
-async function salvarOrcamento(){
-  const c=document.getElementById('oc').value.trim(), its=oi.filter(i=>i.id).map(i=>({id:i.id,nome:nomeItemCor(i),qtd:i.q,preco:i.p,...(i.cor?{cor:i.cor}:{})}));
-  if(!c||!its.length) return alert('Informe o cliente e produtos');
-  const semCor=itemSemCor(oi); if(semCor) return alert('Escolha a cor do produto "'+semCor.n+'".');
-  const btn=document.getElementById('bso'); btn.textContent='...'; btn.disabled=true;
-  const subtotal=its.reduce((a,i)=>a+i.qtd*i.preco,0);
-  const descRaw=Number(document.getElementById('odesc').value||0);
-  const descModo=document.getElementById('odescmodo').value;
-  const descValor=descModo==='%'?subtotal*(descRaw/100):descRaw;
-  const total=Math.max(0,subtotal-descValor);
-  const pgto=document.getElementById('op').value;
-  const bandeira=document.getElementById('oband')?.value||'';
-  const parcelas=document.getElementById('oparc')?.value||'';
-  const dividir=document.getElementById('odividir')?.checked;
-  const valor2Raw=dividir?Number(document.getElementById('ovalor2')?.value||0):0;
-  const valor2=Math.min(Math.max(0,valor2Raw),total);
-  const valor1=total-valor2;
-  const usaMaq=['Pix Maquininha','Cartão Débito','Cartão Crédito','Parcelado','Link de Pagamento'].includes(pgto);
-  const taxaPct=usaMaq?getTaxaPct(pgto, pgto==='Pix Maquininha'?'pix':pgto==='Link de Pagamento'?'link':bandeira, parcelas):0;
-  const taxaValor=valor1*(taxaPct/100);
-  let pgto2='', bandeira2='', parcelas2='', taxaPct2=0, taxaValor2=0;
-  if(dividir && valor2>0){
-    pgto2=document.getElementById('op2').value;
-    bandeira2=document.getElementById('oband2')?.value||'';
-    parcelas2=document.getElementById('oparc2')?.value||'';
-    const usaMaq2=['Pix Maquininha','Cartão Débito','Cartão Crédito','Parcelado','Link de Pagamento'].includes(pgto2);
-    taxaPct2=usaMaq2?getTaxaPct(pgto2, pgto2==='Pix Maquininha'?'pix':pgto2==='Link de Pagamento'?'link':bandeira2, parcelas2):0;
-    taxaValor2=valor2*(taxaPct2/100);
-    bandeira2=usaMaq2?bandeira2:''; parcelas2=usaMaq2?parcelas2:'';
-  }
-  const endRua=document.getElementById('orua').value, endNum=document.getElementById('onum').value;
-  const endCidade=document.getElementById('ocid').value, endEstado=document.getElementById('ouf').value.toUpperCase();
-  const row={
-    cliente:c, tel:document.getElementById('otel').value, cpf:document.getElementById('ocpf').value,
-    end_rua:endRua, end_num:endNum, end_cidade:endCidade, end_estado:endEstado,
-    itens:its, subtotal, desconto:descValor, desconto_raw:descRaw, desconto_modo:descModo, total,
-    pgto, bandeira:usaMaq?bandeira:'', parcelas:usaMaq?String(parcelas):null,
-    taxa_pct:usaMaq?taxaPct:0, taxa_valor:usaMaq?taxaValor:0,
-    pgto2:(dividir&&valor2>0)?pgto2:'', bandeira2, parcelas2, taxa_pct2:taxaPct2, taxa_valor2:taxaValor2, valor2:(dividir?valor2:0),
-    validade:document.getElementById('oval').value||null, obs:document.getElementById('oo').value,
-    vendedora_id:vid||null, perfil_vendedora_id:pid, status:'aberto'
-  };
-  const {data,error}=await sb.from('orcamentos').insert(row).select().single();
-  btn.textContent='Salvar Orçamento (PDF)'; btn.disabled=false;
-  if(error){ alert('Erro ao salvar orçamento: '+error.message); return; }
-  await gerarOrcamentoPDF(data, its);
-  oi=[{id:'',n:'',q:1,p:0}];
-  ['oc','otel','ocpf','orua','onum','ocid','ouf','oo','odesc','ovalor2'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('odividir').checked=false;
-  document.getElementById('oblocomaq2').style.display='none';
-  rO();
-  alert('Orçamento salvo! Você pode encontrá-lo depois em Histórico.');
-}
-async function baixarOrcamentoPDF(id){
-  const o=orcamentosCache.find(x=>x.id===id);
-  if(!o) return alert('Orçamento não encontrado.');
-  await gerarOrcamentoPDF(o, o.itens||[]);
-}
-async function converterOrcamentoEmPedido(id){
-  const o=orcamentosCache.find(x=>x.id===id);
-  if(!o) return alert('Orçamento não encontrado.');
-  if(!confirm('Transformar este orçamento em pedido? Isso vai criar uma venda com os mesmos dados.')) return;
-  const txtData=prompt('Data de entrega (dd/mm/aaaa).\nDeixe em branco se ainda não está definida:','');
-  if(txtData===null) return;
-  let previsaoISO=null;
-  if(txtData.trim()){
-    const m=txtData.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if(!m) return alert('Data inválida. Use o formato dd/mm/aaaa, por exemplo 17/10/2026.');
-    previsaoISO=m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
-  }
-  const row={
-    cliente:o.cliente, tel:o.tel||'', cpf:o.cpf||'',
-    end_rua:o.end_rua||'', end_num:o.end_num||'', end_cidade:o.end_cidade||'', end_estado:o.end_estado||'',
-    itens:o.itens, subtotal:o.subtotal, desconto:o.desconto, desconto_raw:o.desconto_raw, desconto_modo:o.desconto_modo,
-    total:o.total, pgto:o.pgto, bandeira:o.bandeira||'', parcelas:o.parcelas||null,
-    taxa_pct:o.taxa_pct||0, taxa_valor:o.taxa_valor||0,
-    valor_liquido:(o.total-(o.taxa_valor||0)-(o.taxa_valor2||0)),
-    pgto2:o.pgto2||'', bandeira2:o.bandeira2||'', parcelas2:o.parcelas2||'', taxa_pct2:o.taxa_pct2||0, taxa_valor2:o.taxa_valor2||0, valor2:o.valor2||0,
-    pgto_recebido:'nao', vendedora_id:vid||null, perfil_vendedora_id:pid,
-    status:'pendente', previsao_iso:previsaoISO, obs:o.obs||'',
-    data_venda:hojeISO()
-  };
-  const {data,error}=await sb.from('vendas').insert(row).select().single();
-  if(error){ alert('Erro ao criar o pedido: '+error.message); return; }
-  await ajustarEstoqueVend(o.itens||[],-1);
-  if(previsaoISO){
-    const endCompleto=[row.end_rua,row.end_num,row.end_cidade,row.end_estado].filter(Boolean).join(', ');
-    const entRow={ cliente:row.cliente, end_completo:endCompleto, itens:(o.itens||[]).map(i=>i.qtd+'x '+i.nome).join(', '), entregador_id:null, data_entrega:previsaoISO, periodo:'Manhã', status:'agendado', obs:row.obs, venda_id:data.id };
-    let {error:errEnt}=await sb.from('entregas').insert(entRow);
-    if(errEnt){ ({error:errEnt}=await sb.from('entregas').insert(entRow)); }
-    if(errEnt) alert('ATENÇÃO: o pedido foi criado, mas a entrega NÃO entrou no calendário ('+errEnt.message+'). Avise o administrador.');
-    else entregasVend.push({data_entrega:previsaoISO});
-  }
-  const {error:errUpd}=await sb.from('orcamentos').update({status:'convertido', venda_id:data.id}).eq('id',id);
-  if(errUpd) alert('Pedido criado, mas não consegui marcar o orçamento como convertido: '+errUpd.message);
-  await cOH();
-  await gerarPedidoPDF(data, o.itens||[]);
-}
-async function gerarOrcamentoPDF(orc, its){
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  const W = 210;
+// ─── PDFs DA VENDEDORA (estoque e resumo do mês) ───────────────────────────────
+function dBR(s){ return s?new Date(String(s).slice(0,10)+'T12:00:00').toLocaleDateString('pt-BR'):'—'; }
+function cabecalhoPDF(doc, titulo, sub){
+  const W=210;
   doc.setFillColor(30,77,140); doc.rect(0,0,W,26,'F');
-  let textX = 14;
+  let textX=14;
   if(empLogoBase64){
     try{
       const fmt = empLogoBase64.includes('image/png') ? 'PNG' : empLogoBase64.includes('image/webp') ? 'WEBP' : 'JPEG';
       doc.addImage(empLogoBase64, fmt, 14, 4, 18, 18);
-      textX = 36;
+      textX=36;
     } catch(e){}
   }
   doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(15);
   doc.text(enm, textX, 12);
   doc.setFontSize(9); doc.setFont('helvetica','normal');
-  const sub2 = [emp.cnpj, emp.tel, emp.email].filter(Boolean).join('  ·  ') || 'Controle de Estofados';
-  doc.text(sub2, textX, 18);
+  doc.text([emp.cnpj, emp.tel, emp.email].filter(Boolean).join('  ·  ') || 'Controle de Estofados', textX, 18);
   doc.setFontSize(7.5); doc.text(emp.endereco || ('Emitido em '+new Date().toLocaleString('pt-BR')), textX, 23);
-
   doc.setTextColor(30,40,64); doc.setFontSize(15); doc.setFont('helvetica','bold');
-  doc.text('Orçamento #'+orc.id, 14, 36);
-
-  doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(30,40,64);
-  doc.text('Cliente: '+orc.cliente, 14, 46);
-  doc.setFont('helvetica','normal'); doc.setTextColor(90,106,138);
-  let y=52;
-  if(orc.tel){ doc.text('Telefone: '+orc.tel, 14, y); y+=6; }
-  if(orc.cpf){ doc.text('CPF: '+orc.cpf, 14, y); y+=6; }
-  const endTxt=[orc.end_rua,orc.end_num,orc.end_cidade,orc.end_estado].filter(Boolean).join(', ');
-  if(endTxt){ doc.text('Endereço: '+endTxt, 14, y); y+=6; }
-  doc.text('Vendedor(a): '+(vnome||'-'), 14, y); y+=6;
-  y+=4;
-
-  doc.autoTable({
-    startY:y, margin:{left:14,right:14},
-    head:[['Qtd','Produto','Preço','Subtotal']],
-    body: its.map(i=>[i.qtd, i.nome, fR(i.preco), fR(i.qtd*i.preco)]),
-    styles:{fontSize:10,cellPadding:4}, headStyles:{fillColor:[30,77,140],textColor:255,fontStyle:'bold'},
-    alternateRowStyles:{fillColor:[240,244,248]}
-  });
-  y = doc.lastAutoTable.finalY + 8;
-  if(orc.desconto>0){ doc.setFontSize(10); doc.setTextColor(185,28,28); doc.text('Desconto: -'+fR(orc.desconto), 14, y); y+=7; }
-  doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(26,122,74);
-  doc.text('Total: '+fR(orc.total), 14, y); y+=8;
+  doc.text(titulo, 14, 36);
   doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.setTextColor(90,106,138);
-  const pgtoTxt = [orc.pgto, orc.pgto2].filter(Boolean).join(' + ');
-  doc.text('Forma de pagamento: '+pgtoTxt, 14, y); y+=6;
-  if(orc.validade){ doc.text('Válido até: '+new Date(orc.validade+'T12:00:00').toLocaleDateString('pt-BR'), 14, y); y+=6; }
-  if(orc.obs){ doc.text('Observações: '+orc.obs, 14, y); y+=6; }
-
-  doc.setDrawColor(209,217,230); doc.setLineWidth(0.3); doc.line(14, 284, W-14, 284);
-  doc.setFontSize(7.5); doc.setTextColor(90,106,138);
-  doc.text(enm, 14, 289);
-  doc.text('Documento gerado pelo EstoqueMax', W-14, 289, {align:'right'});
-
-  const nomeArquivo = `orcamento-${orc.id}-${(orc.cliente||'').replace(/[^a-zA-Z0-9]/g,'-')}.pdf`;
-  const blob = doc.output('blob');
+  if(sub) doc.text(sub, 14, 42);
+  return 50;
+}
+function rodapePDF(doc){
+  const W=210, n=doc.getNumberOfPages();
+  for(let p=1;p<=n;p++){
+    doc.setPage(p);
+    doc.setDrawColor(209,217,230); doc.setLineWidth(0.3); doc.line(14,284,W-14,284);
+    doc.setFontSize(7.5); doc.setTextColor(90,106,138); doc.setFont('helvetica','normal');
+    doc.text(enm, 14, 289);
+    doc.text('Documento gerado pelo EstoqueMax · pág. '+p+'/'+n, W-14, 289, {align:'right'});
+  }
+}
+async function entregarPDF(doc, nomeArquivo, titulo){
+  const blob=doc.output('blob');
   if(navigator.canShare && navigator.canShare({files:[new File([blob], nomeArquivo, {type:'application/pdf'})]})){
-    try{
-      await navigator.share({ files:[new File([blob], nomeArquivo, {type:'application/pdf'})], title:'Orçamento #'+orc.id, text:'Segue o orçamento de '+orc.cliente });
-      return;
-    } catch(e){ /* usuário cancelou o compartilhamento, cai no download */ }
+    try{ await navigator.share({ files:[new File([blob], nomeArquivo, {type:'application/pdf'})], title:titulo }); return; }
+    catch(e){ /* cancelou o compartilhamento: baixa o arquivo */ }
   }
   doc.save(nomeArquivo);
+}
+
+// ESTOQUE ATUAL (somente produtos; sem valores)
+async function abrirEstoque(){
+  renderEstoque();
+  const {data}=await sb.from('produtos').select('id,nome,tipo,preco,qtd,cores').eq('ativo',true).order('nome');
+  if(data){ prods=data; renderEstoque(); }
+}
+function estoqueFiltrado(){
+  const t=(document.getElementById('est-busca')?.value||'').toLowerCase().trim();
+  const tipo=document.getElementById('est-tipo')?.value||'todos';
+  const so=document.getElementById('est-so')?.value||'com';
+  return prods.filter(p=>(!t||p.nome.toLowerCase().includes(t)) && (tipo==='todos'||p.tipo===tipo) && (so==='todos'||Number(p.qtd)>0));
+}
+function renderEstoque(){
+  const el=document.getElementById('est-lista'); if(!el) return;
+  const lista=estoqueFiltrado();
+  if(!lista.length){ el.innerHTML='<div style="text-align:center;color:var(--sub);padding:30px">Nenhum produto encontrado</div>'; return; }
+  el.innerHTML=lista.map(p=>{
+    const q=Number(p.qtd)||0, cs=coresP(p);
+    const chips=cs.length?`<div style="margin-top:6px;line-height:1.8">${cs.map(c=>{ const x=Number(c.qtd)||0; return `<span style="display:inline-block;margin:0 5px 3px 0;padding:2px 9px;border-radius:10px;font-size:12px;font-weight:700;background:${x<=0?'#FEE2E2':x<=2?'#FEF3C7':'#DCFCE7'};color:${x<=0?'#B91C1C':x<=2?'#92400E':'#166534'}">${c.nome}: ${x>0?x:'sem estoque'}</span>`; }).join('')}</div>`:'';
+    return `<div class="vi"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><b style="font-size:14px">${p.nome}</b><b style="font-size:18px;color:${q<=0?'var(--vm)':q<=3?'#B45309':'var(--verde)'}">${q}</b></div>${chips}</div>`;
+  }).join('');
+}
+async function exportarEstoquePDF(){
+  const lista=estoqueFiltrado();
+  if(!lista.length) return alert('Nenhum produto para exportar com esse filtro.');
+  const { jsPDF } = window.jspdf;
+  const doc=new jsPDF();
+  const tipo=document.getElementById('est-tipo').value;
+  const sub='Posição em '+new Date().toLocaleString('pt-BR')+' · '+({todos:'Todos os produtos',fabricado:'Produtos fabricados',revenda:'Produtos para revenda'})[tipo]+(document.getElementById('est-so').value==='com'?' · somente com estoque':'');
+  const y=cabecalhoPDF(doc,'Estoque Atual de Produtos',sub);
+  const linhas=[];
+  lista.forEach(p=>{
+    const cs=coresP(p);
+    linhas.push([{content:p.nome,styles:{fontStyle:'bold'}},{content:String(Number(p.qtd)||0),styles:{fontStyle:'bold',halign:'center'}}]);
+    cs.forEach(c=>{ const x=Number(c.qtd)||0; linhas.push([{content:'      • '+c.nome,styles:{textColor:[90,106,138],fontSize:9}},{content:x>0?String(x):'sem estoque',styles:{halign:'center',textColor:x>0?[90,106,138]:[185,28,28],fontSize:9}}]); });
+  });
+  doc.autoTable({ startY:y, margin:{left:14,right:14}, head:[['Produto','Quantidade']], body:linhas,
+    styles:{fontSize:10,cellPadding:3}, headStyles:{fillColor:[30,77,140],textColor:255,fontStyle:'bold'},
+    columnStyles:{1:{cellWidth:38,halign:'center'}} });
+  rodapePDF(doc);
+  await entregarPDF(doc, 'estoque-atual-'+hojeISO()+'.pdf', 'Estoque Atual');
+}
+
+// RESUMO DO MES (vendas + comissao) da propria vendedora
+async function exportarResumoMesPDF(){
+  const mes=document.getElementById('com-mes').value||hojeISO().slice(0,7);
+  const btn=document.getElementById('bresumo'); const txt=btn.textContent; btn.textContent='Gerando...'; btn.disabled=true;
+  try{
+    const {data:vs,error}=await sb.from('vendas').select('*').eq('perfil_vendedora_id',pid).order('criado_em',{ascending:true});
+    if(error){ alert('Erro ao buscar suas vendas: '+error.message); return; }
+    const todas=vs||[];
+    const dataDe=v=>String(v.data_venda||v.criado_em||'').slice(0,10);
+    const dataRec=v=>String(v.data_recebimento||v.data_venda||v.criado_em||'').slice(0,10);
+    const doMes=todas.filter(v=>v.status!=='cancelado' && dataDe(v).slice(0,7)===mes).sort((a,b)=>dataDe(a).localeCompare(dataDe(b)));
+    const canceladas=todas.filter(v=>v.status==='cancelado' && dataDe(v).slice(0,7)===mes).length;
+    const recebidas=todas.filter(v=>v.status!=='cancelado' && v.pgto_recebido==='sim' && dataRec(v).slice(0,7)===mes).sort((a,b)=>dataRec(a).localeCompare(dataRec(b)));
+    const vendido=doMes.reduce((a,v)=>a+Number(v.total||0),0);
+    const recebido=recebidas.reduce((a,v)=>a+Number(v.total||0),0);
+    const comissao=recebido*(vcomissao/100);
+    const aReceber=doMes.filter(v=>v.pgto_recebido!=='sim').reduce((a,v)=>a+Number(v.total||0),0);
+    const mesLbl=new Date(mes+'-01T12:00:00').toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+    const { jsPDF } = window.jspdf;
+    const doc=new jsPDF();
+    let y=cabecalhoPDF(doc,'Resumo do Mês - '+mesLbl, 'Vendedor(a): '+(vnome||'-')+' · emitido em '+new Date().toLocaleString('pt-BR'));
+    const resumo=[
+      ['Vendas no mês', doMes.length+' venda(s) · '+fR(vendido)],
+      ['Ticket médio', doMes.length?fR(vendido/doMes.length):'—'],
+      ['Ainda a receber das vendas do mês', fR(aReceber)],
+      ['Recebido no mês', fR(recebido)+' ('+recebidas.length+' venda(s))'],
+      ['Comissão ('+vcomissao+'% sobre o recebido)', fR(comissao)]
+    ];
+    if(vmeta>0) resumo.splice(1,0,['Meta mensal', fR(vmeta)+' · atingido '+(vendido/vmeta*100).toFixed(0)+'%']);
+    if(canceladas) resumo.push(['Vendas canceladas (não contam)', String(canceladas)]);
+    doc.autoTable({ startY:y, margin:{left:14,right:14}, body:resumo, theme:'grid',
+      styles:{fontSize:10,cellPadding:3.5}, columnStyles:{0:{fontStyle:'bold',fillColor:[240,244,248],cellWidth:78}} });
+    y=doc.lastAutoTable.finalY+9;
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(30,40,64);
+    doc.text('Vendas do mês', 14, y); y+=3;
+    doc.autoTable({ startY:y, margin:{left:14,right:14},
+      head:[['Data','Cliente','Total','Pgto','Status','Recebido']],
+      body: doMes.length?doMes.map(v=>[dBR(dataDe(v)), v.cliente, fR(v.total), v.pgto||'', LB[v.status]||v.status, v.pgto_recebido==='sim'?('Sim · '+dBR(dataRec(v))):'Não']):[['Nenhuma venda neste mês','','','','','']],
+      foot: doMes.length?[['','Total',fR(vendido),'','','']]:undefined,
+      styles:{fontSize:9,cellPadding:3}, headStyles:{fillColor:[30,77,140],textColor:255,fontStyle:'bold'},
+      footStyles:{fillColor:[240,244,248],textColor:[30,40,64],fontStyle:'bold'}, alternateRowStyles:{fillColor:[248,250,252]} });
+    y=doc.lastAutoTable.finalY+9;
+    if(y>250){ doc.addPage(); y=20; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(30,40,64);
+    doc.text('Comissão - vendas recebidas no mês', 14, y); y+=3;
+    doc.autoTable({ startY:y, margin:{left:14,right:14},
+      head:[['Recebido em','Cliente','Venda de','Valor recebido','Comissão']],
+      body: recebidas.length?recebidas.map(v=>[dBR(dataRec(v)), v.cliente, dBR(dataDe(v)), fR(v.total), fR(Number(v.total||0)*vcomissao/100)]):[['Nenhum recebimento neste mês','','','','']],
+      foot: recebidas.length?[['','','Total',fR(recebido),fR(comissao)]]:undefined,
+      styles:{fontSize:9,cellPadding:3}, headStyles:{fillColor:[26,122,74],textColor:255,fontStyle:'bold'},
+      footStyles:{fillColor:[240,244,248],textColor:[30,40,64],fontStyle:'bold'}, alternateRowStyles:{fillColor:[248,250,252]} });
+    rodapePDF(doc);
+    await entregarPDF(doc, 'resumo-'+mes+'-'+(vnome||'vendedora').toLowerCase().replace(/[^a-z0-9]/g,'-')+'.pdf', 'Resumo do mês');
+  } finally { btn.textContent=txt; btn.disabled=false; }
 }
 
 // ─── PÓS-VENDA ──────────────────────────────────────────────────────────────
@@ -1475,7 +1185,7 @@ async function gerarPosVendaPDF(pv){
       else { vnome=p.nome; document.getElementById('nu').textContent=p.nome.split(' ')[0]; }
       const {data:e}=await sb.from('empresa').select('*').eq('id',1).maybeSingle();
       if(e){ emp=e; enm=e.nome||enm; document.getElementById('en').textContent=enm; document.getElementById('en-drawer').textContent=enm; if(e.logo_url) empLogoBase64=await carregarLogoBase64Vend(e.logo_url); }
-      const {data:prs}=await sb.from('produtos').select('id,nome,preco,qtd,cores').eq('ativo',true).order('nome');
+      const {data:prs}=await sb.from('produtos').select('id,nome,tipo,preco,qtd,cores').eq('ativo',true).order('nome');
       prods=prs||[];
       await carregarEntregasVend();
       document.getElementById('ls').style.display='none';

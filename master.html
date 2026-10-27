@@ -244,6 +244,15 @@
   .sidebar-nav::-webkit-scrollbar { width: 4px; }
   .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 2px; }
 </style>
+<style>
+  /* Acesso de consulta (somente leitura): esconde tudo que grava dados */
+  body.consulta [onclick*="abrirModal"]:not([onclick*="abrirModalRomaneio"]),
+  body.consulta [onclick*="editar"], body.consulta [onclick*="excluir"], body.consulta [onclick*="salvar"],
+  body.consulta [onclick*="alternarAtivo"], body.consulta [onclick*="agendarEntrega"], body.consulta [onclick*="sincronizarPrazos"],
+  body.consulta [onclick*="cancelarDataEntrega"], body.consulta [onclick*="confirmarDataEntrega"],
+  body.consulta #alerta-sidebar, body.consulta #alerta-topbar, body.consulta #btn-alerta-aba { display:none !important; }
+  body.consulta select[onchange*="mudar"] { pointer-events:none; appearance:none; -webkit-appearance:none; border-color:transparent !important; background:transparent !important; font-weight:700; }
+</style>
 </head>
 <body>
 
@@ -280,13 +289,13 @@
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
       Dashboard
     </button>
+    <button onclick="irAba('dashvendas')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Dashboard de Vendas
+    </button>
     <button onclick="irAba('vendas')">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
       Vendas
-    </button>
-    <button onclick="irAba('orcamentos')">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-      Orçamentos
     </button>
     <button onclick="irAba('entregas')">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
@@ -336,6 +345,10 @@
     <button id="alerta-sidebar" onclick="irAba('alertas')">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <span id="alerta-n">0</span> alerta(s)
+    </button>
+    <button onclick="abrirModalAcessos()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      Acessos de Consulta
     </button>
     <button onclick="abrirModalEmpresa()">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
@@ -423,6 +436,21 @@
         </table>
       </div>
     </div>
+  </div>
+
+  <!-- DASHBOARD DE VENDAS -->
+  <div id="aba-dashvendas" class="aba">
+    <div class="toolbar" style="margin-bottom:14px">
+      <select id="dv-periodo" onchange="toggleDVPersonalizado();renderDashVendas()">
+        <option value="mes-atual">Mês Atual</option>
+        <option value="mes-anterior">Mês Anterior</option>
+        <option value="todos">Todos os Períodos</option>
+        <option value="personalizado">Personalizado</option>
+      </select>
+      <input type="date" id="dv-data-de" style="display:none" onchange="renderDashVendas()">
+      <input type="date" id="dv-data-ate" style="display:none" onchange="renderDashVendas()">
+    </div>
+    <div id="dv-conteudo"></div>
   </div>
 
   <!-- PRODUTOS -->
@@ -562,27 +590,6 @@
           <th></th>
         </tr></thead>
         <tbody id="tbody-vendas"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- ORÇAMENTOS -->
-  <div id="aba-orcamentos" class="aba">
-    <div class="toolbar">
-      <input id="busca-orcamento" oninput="renderOrcamentos()" placeholder="Buscar por cliente...">
-      <select id="filtro-orcamento-status" onchange="renderOrcamentos()">
-        <option value="todos">Todos os status</option>
-        <option value="aberto">Em aberto</option>
-        <option value="convertido">Virou pedido</option>
-      </select>
-      <select id="filtro-orcamento-vendedora" onchange="renderOrcamentos()">
-        <option value="todas">Todas as vendedoras</option>
-      </select>
-    </div>
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr><th>#</th><th>Data</th><th>Cliente</th><th>Vendedora</th><th>Itens</th><th>Total</th><th>Válido até</th><th>Status</th><th></th></tr></thead>
-        <tbody id="tbody-orcamentos"></tbody>
       </table>
     </div>
   </div>
@@ -759,8 +766,13 @@
         <div style="color:var(--sub);font-size:13px;margin-bottom:16px">Vendas por vendedora com comissões, totais recebidos e pendentes — filtradas pelo período.</div>
         <button class="btn" style="background:#22A05B;color:#fff;display:flex;align-items:center;gap:6px" onclick="exportarPDF('vendas')">Exportar PDF</button>
       </div>
+      <div class="card" style="border-left:5px solid #0E9AA7">
+        <div style="font-weight:700;font-size:15px;margin-bottom:4px">Estoque de Produtos (sem valores)</div>
+        <div style="color:var(--sub);font-size:13px;margin-bottom:16px">Lista de todos os produtos com a quantidade em estoque (e por cor). Não mostra custo, preço nem margem.</div>
+        <button class="btn" style="background:#0E9AA7;color:#fff" onclick="exportarPDF('estoque')">Exportar PDF</button>
+      </div>
       <div class="card" style="border-left:5px solid var(--azul)">
-        <div style="margin-bottom:12px;color:var(--azul)"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>
+        <div style="margin-bottom:12px;color:var(--azul)"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l74a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>
         <div style="font-weight:700;font-size:15px;margin-bottom:4px">Produtos Fabricados</div>
         <div style="color:var(--sub);font-size:13px;margin-bottom:16px">Posição atual do estoque de fabricados.</div>
         <button class="btn btn-primary" onclick="exportarPDF('fabricado')">Exportar PDF</button>
@@ -1372,6 +1384,26 @@
   </div>
 </div>
 
+<!-- MODAL ACESSOS DE CONSULTA -->
+<div class="overlay" id="modal-acessos">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header"><h2>Acessos de Consulta</h2><button onclick="fecharModal('acessos')">&times;</button></div>
+    <div class="modal-body">
+      <div style="color:var(--sub);font-size:13px;margin-bottom:14px">Acesso só para visualizar: <b>Dashboard de Vendas, Vendas, Entregas, Pós-venda e Campanhas</b>, e exportar PDF de <b>vendas, estoque (sem valores) e campanhas</b>. Não altera nada no sistema. A pessoa entra pela mesma página do Master, com o usuário e a senha criados aqui.</div>
+      <div id="acessos-lista" style="margin-bottom:16px"></div>
+      <div style="border-top:1.5px solid var(--borda);padding-top:14px">
+        <div style="font-weight:700;margin-bottom:10px">Novo acesso</div>
+        <div class="field"><label>Nome da pessoa</label><input id="acesso-nome" placeholder="Ex: Maria (gerente)"></div>
+        <div class="grid2">
+          <div class="field"><label>Usuário (login)</label><input id="acesso-usuario" placeholder="Ex: maria" autocomplete="off"></div>
+          <div class="field"><label>Senha (mín. 6)</label><input id="acesso-senha" type="text" placeholder="Senha" autocomplete="off"></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:6px"><button class="btn btn-success" id="btn-criar-acesso" onclick="criarAcessoConsulta()">Criar acesso</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL EMPRESA -->
 <div class="overlay" id="modal-empresa">
   <div class="modal" style="max-width:520px">
@@ -1419,7 +1451,6 @@ let entregas = [];
 let vendedoras = [];
 let entregadores = [];
 let posVendas = [];
-let orcamentos = [];
 let fornecedores = [];
 let funcionarios = [];
 let editandoPosVenda = null;
@@ -1541,10 +1572,6 @@ async function carregarTudo(){
     posVendas = pv.data||[];
   } catch(e){ posVendas = []; }
   try{
-    const oc = await sb.from('orcamentos').select('*').order('criado_em',{ascending:false});
-    orcamentos = oc.data||[];
-  } catch(e){ orcamentos = []; }
-  try{
     const fo = await sb.from('fornecedores').select('*').order('nome');
     fornecedores = fo.data||[];
   } catch(e){ fornecedores = []; }
@@ -1560,10 +1587,11 @@ async function carregarTudo(){
 }
 
 // ─── SIDEBAR / NAVEGAÇÃO ──────────────────────────────────────────────────────
-const NOMES_ABAS = { dashboard:'Dashboard', vendas:'Vendas', orcamentos:'Orçamentos', entregas:'Entregas', posvenda:'Pós-venda', funcionarios:'Funcionários', campanhas:'Campanhas', produtos:'Produtos', materias:'Matérias-Primas', fornecedores:'Fornecedores', alertas:'Alertas', exportar:'Exportar PDF', backup:'Backup' };
+const NOMES_ABAS = { dashboard:'Dashboard', dashvendas:'Dashboard de Vendas', vendas:'Vendas', entregas:'Entregas', posvenda:'Pós-venda', funcionarios:'Funcionários', campanhas:'Campanhas', produtos:'Produtos', materias:'Matérias-Primas', fornecedores:'Fornecedores', alertas:'Alertas', exportar:'Exportar PDF', backup:'Backup' };
 function abrirSidebar(){ document.getElementById('sidebar').classList.add('open'); document.getElementById('sidebar-overlay').classList.add('show'); }
 function fecharSidebar(){ document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebar-overlay').classList.remove('show'); }
 function irAba(id){
+  if(modoConsulta && !ABAS_CONSULTA.includes(id)) return;
   document.querySelectorAll('.aba').forEach(a=>a.classList.remove('ativo'));
   document.getElementById('aba-'+id).classList.add('ativo');
   document.querySelectorAll('.sidebar-nav button').forEach(b=>b.classList.remove('ativo'));
@@ -1571,7 +1599,7 @@ function irAba(id){
   if(btn) btn.classList.add('ativo');
   const tt=document.getElementById('topbar-titulo'); if(tt) tt.textContent=NOMES_ABAS[id]||id;
   if(id==='vendas') renderVendas();
-  if(id==='orcamentos') renderOrcamentos();
+  if(id==='dashvendas') renderDashVendas();
   if(id==='entregas'){ renderEntregas(); renderCalendario(); }
   if(id==='produtos') renderProd();
   if(id==='materias') renderMP();
@@ -1925,6 +1953,169 @@ async function excluirFornecedor(id){
   if(error){ alert('Erro: '+error.message); return; }
   if(!apagados || !apagados.length){ alert('Fornecedor não excluído: falta permissão no banco (RLS).'); return; }
   fornecedores=fornecedores.filter(f=>f.id!==id); renderFornecedores(); renderMP(); renderAlertas();
+}
+
+// ─── DASHBOARD DE VENDAS ─────────────────────────────────────────────────────
+function toggleDVPersonalizado(){
+  const m=document.getElementById('dv-periodo').value==='personalizado';
+  ['dv-data-de','dv-data-ate'].forEach(id=>{ document.getElementById(id).style.display=m?'block':'none'; });
+}
+// Periodo equivalente anterior, para comparar (null = sem comparacao)
+function periodoAnteriorDV(r, sel){
+  if(r.todos) return null;
+  const h=new Date();
+  if(sel==='mes-atual'){
+    const ult=new Date(h.getFullYear(),h.getMonth(),0).getDate();
+    return {de:isoLocal(new Date(h.getFullYear(),h.getMonth()-1,1)), ate:isoLocal(new Date(h.getFullYear(),h.getMonth()-1,Math.min(h.getDate(),ult))), todos:false, rotulo:'mesmo período do mês anterior'};
+  }
+  if(sel==='mes-anterior'){
+    return {de:isoLocal(new Date(h.getFullYear(),h.getMonth()-2,1)), ate:isoLocal(new Date(h.getFullYear(),h.getMonth()-1,0)), todos:false, rotulo:'mês retrasado'};
+  }
+  if(r.de && r.ate){
+    const d1=new Date(r.de+'T12:00:00'), d2=new Date(r.ate+'T12:00:00');
+    const dias=Math.round((d2-d1)/864e5)+1;
+    const fim=new Date(d1); fim.setDate(fim.getDate()-1);
+    const ini=new Date(fim); ini.setDate(ini.getDate()-dias+1);
+    return {de:isoLocal(ini), ate:isoLocal(fim), todos:false, rotulo:'período anterior de mesma duração'};
+  }
+  return null;
+}
+function dvBarra(pct,cor,alt){
+  return `<div style="background:#E5E7EB;border-radius:6px;height:${alt||10}px;overflow:hidden"><div style="width:${Math.max(0,Math.min(100,pct))}%;height:100%;background:${cor};border-radius:6px"></div></div>`;
+}
+function dvCard(titulo, corpo, extra){
+  return `<div class="card"><div style="font-weight:800;font-size:14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:8px"><span>${titulo}</span>${extra||''}</div>${corpo}</div>`;
+}
+function renderDashVendas(){
+  const el=document.getElementById('dv-conteudo'); if(!el) return;
+  const sel=document.getElementById('dv-periodo').value;
+  const range=getPeriodoRange('dv');
+  const ativasTodas=vendas.filter(v=>v.status!=='cancelado');
+  const ativas=ativasTodas.filter(v=>dentroDoPeriodo(v.dataISO,range));
+  const canceladas=vendas.filter(v=>v.status==='cancelado' && dentroDoPeriodo(v.dataISO,range));
+  const total=ativas.reduce((a,v)=>a+v.total,0);
+  const ticket=ativas.length?total/ativas.length:0;
+  const recebido=ativasTodas.filter(v=>v.pgtoRecebido==='sim' && dentroDoPeriodo(v.dataRecebimento||v.dataISO,range)).reduce((a,v)=>a+v.total,0);
+  const aReceber=ativas.filter(v=>v.pgtoRecebido!=='sim').reduce((a,v)=>a+v.total,0);
+  const totalCanc=canceladas.reduce((a,v)=>a+v.total,0);
+  const aguardando=ativas.filter(v=>v.status!=='entregue').length;
+  const pctCanc=(ativas.length+canceladas.length)?canceladas.length/(ativas.length+canceladas.length)*100:0;
+
+  // comparacao com o periodo anterior
+  const ant=periodoAnteriorDV(range, sel);
+  let comp='';
+  if(ant){
+    const vAnt=ativasTodas.filter(v=>dentroDoPeriodo(v.dataISO,ant));
+    const totAnt=vAnt.reduce((a,v)=>a+v.total,0);
+    const delta=totAnt>0?(total-totAnt)/totAnt*100:null;
+    comp=`${fmtR(totAnt)} no ${ant.rotulo}`+(delta===null?'':` · <b style="color:${delta>=0?'#1A7A4A':'#B91C1C'}">${delta>=0?'▲':'▼'} ${Math.abs(delta).toFixed(0)}%</b>`);
+  }
+  const kpis=[
+    {l:'Vendido no período',v:fmtR(total),s:ativas.length+' venda(s)'+(comp?'<br>'+comp:''),cor:'#2E6BC4'},
+    {l:'Ticket médio',v:fmtR(ticket),s:'por venda',cor:'#1E4D8C'},
+    {l:'Recebido',v:fmtR(recebido),s:'pagamentos confirmados no período',cor:'#22A05B'},
+    {l:'A receber',v:fmtR(aReceber),s:'vendas do período ainda não pagas',cor:'#F59E0B'},
+    {l:'Aguardando entrega',v:aguardando,s:'vendas do período não entregues',cor:'#B45309'},
+    {l:'Cancelamentos',v:canceladas.length,s:fmtR(totalCanc)+' · '+pctCanc.toFixed(1).replace('.',',')+'% das vendas',cor:'#B91C1C'},
+  ];
+  const kpiHtml=`<div class="kpi-grid" style="margin-bottom:16px">${kpis.map(k=>`<div class="kpi" style="border-left:5px solid ${k.cor}"><div class="kpi-label">${k.l}</div><div class="kpi-valor">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('')}</div>`;
+
+  // meta da loja (soma das metas individuais) - so quando o periodo e um mes fechado
+  let metaHtml='';
+  if(sel==='mes-atual' || sel==='mes-anterior'){
+    const metaLoja=vendedoras.filter(vendedoraAtiva).reduce((a,v)=>a+(Number(v.meta_mensal)||0),0);
+    if(metaLoja>0){
+      const pct=total/metaLoja*100;
+      metaHtml=dvCard('🎯 Meta do mês da loja',`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span>Soma das metas individuais: <b>${fmtR(metaLoja)}</b></span><span>Vendido: <b>${fmtR(total)}</b> (${pct.toFixed(0)}%)</span></div>${dvBarra(pct,pct>=100?'#1A7A4A':'#2E6BC4',16)}<div style="font-size:12px;color:var(--sub);margin-top:6px">${pct>=100?'Meta batida! 🎉':'Faltam '+fmtR(metaLoja-total)+' para a meta'}</div>`);
+    }
+  }
+
+  // ranking por vendedora
+  const porVend={};
+  ativas.forEach(v=>{ const k=v.vendedoraId||'sem'; (porVend[k]=porVend[k]||{total:0,qtd:0}); porVend[k].total+=v.total; porVend[k].qtd++; });
+  const linhasV=vendedoras.filter(v=>vendedoraAtiva(v)||porVend[v.id]).map(v=>({id:v.id,nome:v.nome+(vendedoraAtiva(v)?'':' (inativa)'),meta:Number(v.meta_mensal)||0,total:(porVend[v.id]||{}).total||0,qtd:(porVend[v.id]||{}).qtd||0}));
+  if(porVend.sem) linhasV.push({id:'sem',nome:'Sem vendedora',meta:0,total:porVend.sem.total,qtd:porVend.sem.qtd});
+  linhasV.sort((a,b)=>b.total-a.total||a.nome.localeCompare(b.nome));
+  const maxV=Math.max(1,...linhasV.map(r=>r.total));
+  const mesFechado=(sel==='mes-atual'||sel==='mes-anterior');
+  const medalha=['🥇','🥈','🥉'];
+  const rankHtml=dvCard('🏅 Vendas por vendedora',`<div class="tbl-wrap" style="border-radius:10px"><table><thead><tr><th></th><th>Vendedora</th><th style="min-width:120px">Participação</th><th style="text-align:right">Vendas</th><th style="text-align:right">Ticket médio</th><th style="text-align:right">Total</th><th style="text-align:right">% da loja</th>${mesFechado?'<th style="text-align:right">Meta</th>':''}</tr></thead><tbody>${linhasV.map((r,i)=>`<tr><td style="width:36px;text-align:center">${r.total>0&&r.id!=='sem'?(medalha[linhasV.filter(x=>x.id!=='sem').indexOf(r)]||''):''}</td><td><b>${r.nome}</b></td><td>${dvBarra(r.total/maxV*100,'#2E6BC4')}</td><td style="text-align:right">${r.qtd}</td><td style="text-align:right">${r.qtd?fmtR(r.total/r.qtd):'—'}</td><td style="text-align:right"><b>${fmtR(r.total)}</b></td><td style="text-align:right">${total?(r.total/total*100).toFixed(1).replace('.',',')+'%':'—'}</td>${mesFechado?`<td style="text-align:right">${r.meta>0?`<span style="font-weight:700;color:${r.total>=r.meta?'#1A7A4A':'var(--sub)'}">${(r.total/r.meta*100).toFixed(0)}%</span><div style="font-size:10.5px;color:var(--sub)">${fmtR(r.meta)}</div>`:'<span style="color:var(--sub)">—</span>'}</td>`:''}</tr>`).join('')||'<tr><td colspan="8" class="sem-dados">Sem vendas no período.</td></tr>'}</tbody></table></div>`);
+
+  // vendas por dia (ou por mes quando o periodo e longo)
+  let de=range.de, ate=range.ate;
+  const datas=ativas.map(v=>v.dataISO).filter(Boolean).sort();
+  if(!de) de=datas[0]||hojeISO();
+  if(!ate) ate=datas.length?datas[datas.length-1]:hojeISO();
+  const d1=new Date(de+'T12:00:00'), d2=new Date(ate+'T12:00:00');
+  const nDias=Math.max(1,Math.round((d2-d1)/864e5)+1);
+  const porMes=nDias>62;
+  const serie=[];
+  if(porMes){
+    const c=new Date(d1.getFullYear(),d1.getMonth(),1);
+    while(c<=d2){ const k=c.getFullYear()+'-'+String(c.getMonth()+1).padStart(2,'0'); serie.push({k,label:c.toLocaleDateString('pt-BR',{month:'short',year:'2-digit'}).replace('.',''),total:0,qtd:0}); c.setMonth(c.getMonth()+1); }
+  } else {
+    const c=new Date(d1);
+    for(let i=0;i<nDias;i++){ const k=isoLocal(c); serie.push({k,label:String(c.getDate()),total:0,qtd:0}); c.setDate(c.getDate()+1); }
+  }
+  const idxSerie={}; serie.forEach((s,i)=>{ idxSerie[s.k]=i; });
+  ativas.forEach(v=>{ const k=porMes?String(v.dataISO).slice(0,7):v.dataISO; const i=idxSerie[k]; if(i!==undefined){ serie[i].total+=v.total; serie[i].qtd++; } });
+  const maxS=Math.max(1,...serie.map(s=>s.total));
+  const diaHtml=dvCard(porMes?'📈 Vendas por mês':'📈 Vendas por dia',`<div style="display:flex;align-items:flex-end;gap:${serie.length>31?2:4}px;height:150px;border-bottom:1.5px solid var(--borda);padding-bottom:2px">${serie.map(s=>`<div title="${porMes?s.label:fmtDataBR(s.k)}: ${fmtR(s.total)} (${s.qtd} venda(s))" style="flex:1;min-width:2px;display:flex;flex-direction:column;justify-content:flex-end;height:100%"><div style="height:${s.total>0?Math.max(3,s.total/maxS*100):0}%;background:${s.total>0?'#2E6BC4':'transparent'};border-radius:3px 3px 0 0"></div></div>`).join('')}</div>
+    <div style="display:flex;gap:${serie.length>31?2:4}px;margin-top:3px">${serie.map((s,i)=>`<div style="flex:1;min-width:2px;text-align:center;font-size:${serie.length>20?9:10}px;color:var(--sub);overflow:hidden;white-space:nowrap">${(serie.length<=16||i%Math.ceil(serie.length/16)===0)?s.label:''}</div>`).join('')}</div>
+    <div style="font-size:12px;color:var(--sub);margin-top:8px">Passe o mouse (ou toque) em uma barra para ver o valor. Melhor ${porMes?'mês':'dia'}: <b>${(()=>{ const b=serie.reduce((m,s)=>s.total>m.total?s:m,serie[0]); return b.total>0?(porMes?b.label:fmtDataBR(b.k))+' — '+fmtR(b.total):'—'; })()}</b></div>`);
+
+  // formas de pagamento
+  const porPg={}; ativas.forEach(v=>{ const k=v.pgto||'—'; porPg[k]=(porPg[k]||0)+v.total; });
+  const pgArr=Object.entries(porPg).sort((a,b)=>b[1]-a[1]);
+  const pgHtml=dvCard('💳 Formas de pagamento',pgArr.length?pgArr.map(([k,v])=>`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span>${k}</span><span><b>${fmtR(v)}</b> · ${total?(v/total*100).toFixed(0):0}%</span></div>${dvBarra(total?v/total*100:0,'#1A7A4A')}</div>`).join(''):'<div style="color:var(--sub);font-size:13px">Sem vendas no período.</div>');
+
+  // produtos mais vendidos
+  const porProd={};
+  ativas.forEach(v=>(v.itens||[]).forEach(i=>{
+    const prod=i.id?produtos.find(p=>p.id==i.id):null;
+    const nome=prod?prod.nome:String(i.nome||'').split(' — ')[0];
+    const k=i.id?'p'+i.id:nome;
+    const o=porProd[k]=porProd[k]||{nome,qtd:0,valor:0};
+    o.qtd+=Number(i.qtd)||0; o.valor+=(Number(i.qtd)||0)*(Number(i.preco)||0);
+  }));
+  const topP=Object.values(porProd).sort((a,b)=>b.qtd-a.qtd||b.valor-a.valor).slice(0,10);
+  const maxP=Math.max(1,...topP.map(p=>p.qtd));
+  const prodHtml=dvCard('🛋️ Produtos mais vendidos',topP.length?topP.map((p,i)=>`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;gap:8px;font-size:12.5px;margin-bottom:3px"><span>${i+1}. ${p.nome}</span><span style="white-space:nowrap"><b>${p.qtd} un</b> · ${fmtR(p.valor)}</span></div>${dvBarra(p.qtd/maxP*100,'#7C3AED')}</div>`).join(''):'<div style="color:var(--sub);font-size:13px">Sem vendas no período.</div>');
+
+  // situacao das vendas + dia da semana
+  const st={pendente:0,confirmado:0,entregue:0};
+  ativas.forEach(v=>{ if(st[v.status]!==undefined) st[v.status]++; });
+  const corSt={pendente:'#F59E0B',confirmado:'#2E6BC4',entregue:'#1A7A4A'}, lblSt={pendente:'Pendente',confirmado:'Confirmado',entregue:'Entregue'};
+  const totAt=ativas.length||1;
+  const stHtml=dvCard('📦 Situação das vendas',`<div style="display:flex;height:18px;border-radius:9px;overflow:hidden;background:#E5E7EB;margin-bottom:10px">${Object.keys(st).map(k=>`<div title="${lblSt[k]}: ${st[k]}" style="width:${st[k]/totAt*100}%;background:${corSt[k]}"></div>`).join('')}</div><div style="display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px">${Object.keys(st).map(k=>`<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${corSt[k]};margin-right:5px"></span>${lblSt[k]}: <b>${st[k]}</b></span>`).join('')}<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#B91C1C;margin-right:5px"></span>Canceladas: <b>${canceladas.length}</b></span></div>`);
+  const dow=[0,0,0,0,0,0,0], dowQ=[0,0,0,0,0,0,0];
+  ativas.forEach(v=>{ if(v.dataISO){ const d=new Date(v.dataISO+'T12:00:00').getDay(); dow[d]+=v.total; dowQ[d]++; } });
+  const maxD=Math.max(1,...dow), nomesD=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const dowHtml=dvCard('📅 Vendas por dia da semana',`<div style="display:flex;align-items:flex-end;gap:8px;height:110px">${dow.map((v,i)=>`<div title="${nomesD[i]}: ${fmtR(v)} (${dowQ[i]} venda(s))" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%"><div style="height:${v>0?Math.max(4,v/maxD*100):0}%;background:#0E9AA7;border-radius:4px 4px 0 0"></div></div>`).join('')}</div><div style="display:flex;gap:8px;margin-top:4px">${nomesD.map((n,i)=>`<div style="flex:1;text-align:center;font-size:11px;color:var(--sub)">${n}<br><b style="color:var(--txt)">${dowQ[i]}</b></div>`).join('')}</div>`);
+
+  // campanhas em andamento
+  const emAnd=campanhas.filter(c=>statusCampanha(c).k==='andamento');
+  const campHtml=dvCard('🏆 Campanhas em andamento',emAnd.length?emAnd.map(c=>{
+    const calc=calcCampanha(c), metaLoja=Number(c.meta_loja)||0;
+    let corpo;
+    if(c.tipo==='ranking'){
+      const top=calc.rows.filter(r=>r.total>0).slice(0,3);
+      corpo=(metaLoja>0?`<div style="font-size:12px;margin-bottom:3px">Meta da loja: <b>${fmtR(metaLoja)}</b> · vendido <b>${fmtR(calc.lojaTotal)}</b> (${Math.round(calc.lojaTotal/metaLoja*100)}%)</div>${dvBarra(calc.lojaTotal/metaLoja*100,calc.condicaoOk?'#1A7A4A':'#F59E0B')}<div style="font-size:11.5px;margin:3px 0 6px;font-weight:700;color:${calc.condicaoOk?'var(--verde)':'var(--am)'}">${calc.condicaoOk?'Meta da loja atingida':'Faltam '+fmtR(metaLoja-calc.lojaTotal)}</div>`:'')
+        +(top.length?top.map((r,i)=>`<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:3px 0">${medalha[i]} <b style="flex:1;margin-left:6px">${r.nome}</b><span>${fmtR(r.total)}</span></div>`).join(''):'<div style="font-size:12.5px;color:var(--sub)">Ainda sem vendas.</div>');
+    } else {
+      const meta=Number(c.meta_individual)||0;
+      const bateu=calc.rows.filter(r=>meta>0&&r.total>=meta);
+      const lider=calc.rows.filter(r=>r.total>0).slice(0,3);
+      corpo=`<div style="font-size:12.5px;margin-bottom:5px">Meta individual: <b>${fmtR(meta)}</b> · bateram: <b>${bateu.length}</b> de ${calc.rows.length}${bateu.length?' ('+bateu.map(r=>r.nome.split(' ')[0]).join(', ')+')':''}</div>`
+        +lider.map(r=>`<div style="font-size:12px;margin-bottom:4px"><div style="display:flex;justify-content:space-between"><span>${r.nome}</span><span>${fmtR(r.total)} · ${meta>0?Math.round(r.total/meta*100):0}%</span></div>${dvBarra(meta>0?r.total/meta*100:0,meta>0&&r.total>=meta?'#1A7A4A':'#2E6BC4',8)}</div>`).join('');
+    }
+    return `<div style="border:1.5px solid var(--borda);border-radius:10px;padding:10px 12px;margin-bottom:10px"><div style="font-weight:700;font-size:13px">${c.tipo==='ranking'?'🏆':'🎯'} ${c.nome} <span style="font-weight:500;font-size:11.5px;color:var(--sub)">· ${fmtDataBR(c.data_inicio)} a ${fmtDataBR(c.data_fim)}</span></div><div style="margin-top:6px">${corpo}</div></div>`;
+  }).join(''):'<div style="color:var(--sub);font-size:13px">Nenhuma campanha em andamento.</div>',
+    `<button class="btn btn-sm btn-ghost" onclick="irAba('campanhas')">Ver campanhas</button>`);
+
+  const grid=(...cards)=>`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px;margin-bottom:16px">${cards.join('')}</div>`;
+  el.innerHTML=kpiHtml+metaHtml+(metaHtml?'<div style="height:16px"></div>':'')+rankHtml+'<div style="height:16px"></div>'+diaHtml+'<div style="height:16px"></div>'
+    +grid(pgHtml,prodHtml)+grid(stHtml,dowHtml)+campHtml;
 }
 
 // ─── CAMPANHAS / BONIFICAÇÕES ────────────────────────────────────────────────
@@ -2504,8 +2695,6 @@ function popularSelectVendedoras(incluirId){
   const el=document.getElementById('v-vendedora'); if(el) el.innerHTML=opts;
   const filtro=document.getElementById('filtro-venda-vendedora');
   if(filtro) filtro.innerHTML='<option value="todas">Todas as vendedoras</option>'+vendedoras.map(v=>`<option value="${v.id}">${v.nome}</option>`).join('');
-  const filtroOrc=document.getElementById('filtro-orcamento-vendedora');
-  if(filtroOrc) filtroOrc.innerHTML='<option value="todas">Todas as vendedoras</option>'+vendedoras.map(v=>`<option value="${v.id}">${v.nome}</option>`).join('');
   const filtroEnt=document.getElementById('filtro-entrega-vendedora');
   if(filtroEnt) filtroEnt.innerHTML='<option value="todas">Todas as vendedoras</option>'+vendedoras.map(v=>`<option value="${v.id}">${v.nome}</option>`).join('');
 }
@@ -3108,141 +3297,6 @@ function renderVendas(){
     </div></td></tr>`;
   }).join('');
 }
-// ─── ORÇAMENTOS ─────────────────────────────────────────────────────────────
-function renderOrcamentos(){
-  const busca=(document.getElementById('busca-orcamento')?.value||'').toLowerCase();
-  const filtroSt=document.getElementById('filtro-orcamento-status')?.value||'todos';
-  const filtroVend=document.getElementById('filtro-orcamento-vendedora')?.value||'todas';
-  const lista=orcamentos.filter(o=>{
-    const mb=(o.cliente||'').toLowerCase().includes(busca);
-    const ms=filtroSt==='todos'||o.status===filtroSt;
-    const mv=filtroVend==='todas'||String(o.vendedora_id)===filtroVend;
-    return mb&&ms&&mv;
-  });
-  const tbody=document.getElementById('tbody-orcamentos');
-  if(!lista.length){ tbody.innerHTML=`<tr><td colspan="9" class="sem-dados">Nenhum orçamento encontrado.</td></tr>`; return; }
-  tbody.innerHTML=lista.map(o=>{
-    const vend=vendedoras.find(x=>x.id==o.vendedora_id);
-    const convertido=o.status==='convertido';
-    return `<tr>
-    <td style="color:var(--sub)">#${o.id}</td><td>${fmtDataBR((o.criado_em||'').slice(0,10))}</td>
-    <td><b>${o.cliente}</b>${o.tel?`<div style="font-size:11px;color:var(--sub)">${o.tel}</div>`:''}</td>
-    <td style="font-size:12px">${vend?vend.nome:'<span style="color:var(--sub)">—</span>'}</td>
-    <td style="font-size:12px;color:var(--sub)">${(o.itens||[]).map(i=>i.qtd+'x '+i.nome).join(', ')}</td>
-    <td><b style="color:var(--verde)">${fmtR(o.total)}</b></td>
-    <td style="font-size:12px;color:var(--sub)">${o.validade?fmtDataBR(o.validade):'—'}</td>
-    <td>${convertido?badge('Virou Pedido'+(o.venda_id?' #'+o.venda_id:''),'badge-verde'):badge('Em aberto','badge-am')}</td>
-    <td><div style="display:flex;gap:4px">
-        <button class="btn btn-sm" style="background:#1A2540;color:#fff" onclick="baixarOrcamentoPDFMaster(${o.id})">PDF</button>
-        ${!convertido?`<button class="btn btn-sm btn-success" onclick="transformarOrcamentoEmPedidoMaster(${o.id})">Virou Pedido</button>`:''}
-    </div></td></tr>`;
-  }).join('');
-}
-function baixarOrcamentoPDFMaster(id){
-  const o=orcamentos.find(x=>x.id===id);
-  if(!o) return alert('Orçamento não encontrado.');
-  gerarOrcamentoPDFMaster(o);
-}
-function gerarOrcamentoPDFMaster(orc){
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  const W = 210;
-  doc.setFillColor(30,77,140); doc.rect(0,0,W,26,'F');
-  let textX = 14;
-  if(empresaLogoBase64){
-    try{
-      const fmt = empresaLogoBase64.includes('image/png') ? 'PNG' : empresaLogoBase64.includes('image/webp') ? 'WEBP' : 'JPEG';
-      doc.addImage(empresaLogoBase64, fmt, 14, 4, 18, 18);
-      textX = 36;
-    } catch(e){}
-  }
-  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(15);
-  doc.text(empresa.nome||'EstoqueMax', textX, 12);
-  doc.setFontSize(9); doc.setFont('helvetica','normal');
-  const sub2=[empresa.cnpj, empresa.tel, empresa.email].filter(Boolean).join('  ·  ') || 'Controle de Estofados';
-  doc.text(sub2, textX, 18);
-  doc.setFontSize(7.5); doc.text(empresa.end || ('Emitido em '+new Date().toLocaleString('pt-BR')), textX, 23);
-
-  doc.setTextColor(30,40,64); doc.setFontSize(15); doc.setFont('helvetica','bold');
-  doc.text('Orçamento #'+orc.id, 14, 36);
-
-  doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(30,40,64);
-  doc.text('Cliente: '+orc.cliente, 14, 46);
-  doc.setFont('helvetica','normal'); doc.setTextColor(90,106,138);
-  let y=52;
-  if(orc.tel){ doc.text('Telefone: '+orc.tel, 14, y); y+=6; }
-  if(orc.cpf){ doc.text('CPF: '+orc.cpf, 14, y); y+=6; }
-  const endTxt=[orc.end_rua,orc.end_num,orc.end_cidade,orc.end_estado].filter(Boolean).join(', ');
-  if(endTxt){ doc.text('Endereço: '+endTxt, 14, y); y+=6; }
-  const vend=vendedoras.find(x=>x.id==orc.vendedora_id);
-  doc.text('Vendedor(a): '+(vend?vend.nome:'-'), 14, y); y+=6;
-  y+=4;
-
-  doc.autoTable({
-    startY:y, margin:{left:14,right:14},
-    head:[['Qtd','Produto','Preço','Subtotal']],
-    body:(orc.itens||[]).map(i=>[i.qtd, i.nome, fmtR(i.preco), fmtR(i.qtd*i.preco)]),
-    styles:{fontSize:10,cellPadding:4}, headStyles:{fillColor:[30,77,140],textColor:255,fontStyle:'bold'},
-    alternateRowStyles:{fillColor:[240,244,248]}
-  });
-  y = doc.lastAutoTable.finalY + 8;
-  if(orc.desconto>0){ doc.setFontSize(10); doc.setTextColor(185,28,28); doc.text('Desconto: -'+fmtR(orc.desconto), 14, y); y+=7; }
-  doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(26,122,74);
-  doc.text('Total: '+fmtR(orc.total), 14, y); y+=8;
-  doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.setTextColor(90,106,138);
-  const pgtoTxt=[orc.pgto, orc.pgto2].filter(Boolean).join(' + ');
-  doc.text('Forma de pagamento: '+pgtoTxt, 14, y); y+=6;
-  if(orc.validade){ doc.text('Válido até: '+fmtDataBR(orc.validade), 14, y); y+=6; }
-  if(orc.obs){ doc.text('Observações: '+orc.obs, 14, y); y+=6; }
-
-  doc.setDrawColor(209,217,230); doc.setLineWidth(0.3); doc.line(14, 284, W-14, 284);
-  doc.setFontSize(7.5); doc.setTextColor(90,106,138);
-  doc.text(empresa.nome||'EstoqueMax', 14, 289);
-  doc.text('Documento gerado pelo EstoqueMax', W-14, 289, {align:'right'});
-
-  doc.save(`orcamento-${orc.id}-${(orc.cliente||'').replace(/[^a-zA-Z0-9]/g,'-')}.pdf`);
-}
-async function transformarOrcamentoEmPedidoMaster(id){
-  const o=orcamentos.find(x=>x.id===id);
-  if(!o) return alert('Orçamento não encontrado.');
-  if(!confirm('Transformar este orçamento em pedido? Isso vai criar uma venda com os mesmos dados.')) return;
-  const txtData=prompt('Data de entrega (dd/mm/aaaa).\nDeixe em branco se ainda não está definida:','');
-  if(txtData===null) return;
-  let previsaoISO=null;
-  if(txtData.trim()){
-    const m=txtData.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if(!m) return alert('Data inválida. Use o formato dd/mm/aaaa, por exemplo 17/10/2026.');
-    previsaoISO=m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
-  }
-  const row={
-    cliente:o.cliente, tel:o.tel||'', cpf:o.cpf||'',
-    end_rua:o.end_rua||'', end_num:o.end_num||'', end_cidade:o.end_cidade||'', end_estado:o.end_estado||'',
-    itens:o.itens, subtotal:o.subtotal, desconto:o.desconto, desconto_raw:o.desconto_raw, desconto_modo:o.desconto_modo,
-    total:o.total, pgto:o.pgto, bandeira:o.bandeira||'', parcelas:o.parcelas||null,
-    taxa_pct:o.taxa_pct||0, taxa_valor:o.taxa_valor||0,
-    valor_liquido:(o.total-(o.taxa_valor||0)-(o.taxa_valor2||0)),
-    pgto2:o.pgto2||'', bandeira2:o.bandeira2||'', parcelas2:o.parcelas2||'', taxa_pct2:o.taxa_pct2||0, taxa_valor2:o.taxa_valor2||0, valor2:o.valor2||0,
-    pgto_recebido:'nao', vendedora_id:o.vendedora_id||null, perfil_vendedora_id:o.perfil_vendedora_id||null,
-    status:'pendente', previsao_iso:previsaoISO, obs:o.obs||'',
-    data_venda:hojeISO()
-  };
-  const {data,error}=await sb.from('vendas').insert(row).select().single();
-  if(error){ alert('Erro ao criar o pedido: '+error.message); return; }
-  await ajustarEstoqueVenda(o.itens||[],-1);
-  if(previsaoISO){
-    const endCompleto=[row.end_rua,row.end_num,row.end_cidade,row.end_estado].filter(Boolean).join(', ');
-    const entObj={ cliente:row.cliente, end:endCompleto, itens:(o.itens||[]).map(i=>i.qtd+'x '+i.nome).join(', '), entregadorId:null, dataISO:previsaoISO, periodo:'Manhã', status:'agendado', obs:row.obs, vendaId:data.id };
-    const {data:entD,error:errEnt}=await sb.from('entregas').insert(entregaToRow(entObj)).select().single();
-    if(errEnt) alert('O pedido foi criado, mas NÃO consegui criar a entrega no calendário: '+errEnt.message);
-    else entregas.push(entregaFromRow(entD));
-  }
-  const {error:errUpd}=await sb.from('orcamentos').update({status:'convertido', venda_id:data.id}).eq('id',id);
-  if(errUpd) alert('Pedido criado, mas não consegui marcar o orçamento como convertido: '+errUpd.message);
-  vendas=[vendaFromRow(data), ...vendas];
-  orcamentos=orcamentos.map(x=>x.id===id?{...x,status:'convertido',venda_id:data.id}:x);
-  renderOrcamentos(); renderVendas(); renderProd(); renderDash(); renderEntregas(); renderCalendario();
-  alert('Pedido #'+data.id+' criado com sucesso!');
-}
 function abrirModalVenda(){
   editandoVenda=null;
   itensVendaTemp=[{id:'',nome:'',qtd:1,preco:0}];
@@ -3566,6 +3620,12 @@ function telDaEntrega(e){
   if(e.posVendaId){ const p=posVendas.find(x=>x.id==e.posVendaId); if(p && p.tel) return p.tel; }
   return '';
 }
+// Nome da vendedora: da venda vinculada ou do pos-venda vinculado
+function vendedoraDaEntrega(e){
+  if(e.vendaId){ const v=vendas.find(x=>x.id==e.vendaId); const vd=v&&v.vendedoraId?vendedoras.find(x=>x.id==v.vendedoraId):null; if(vd) return vd.nome; }
+  if(e.posVendaId){ const p=posVendas.find(x=>x.id==e.posVendaId); if(p && p.vendedora_nome) return p.vendedora_nome; }
+  return '';
+}
 const LBL_STATUS_ENTREGA={agendado:'Agendado',em_rota:'Em Rota',entregue:'Entregue',reagendado:'Reagendado'};
 function trEntrega(e){
   const ent=entregadores.find(x=>x.id==e.entregadorId);
@@ -3846,7 +3906,7 @@ function gerarRomaneio(){
     const linhas=lista.map((e,i)=>{
       const venda=e.vendaId?vendas.find(v=>v.id==e.vendaId):null;
       return `<tr><td class="num">${i+1}</td><td>${e.periodo}</td>
-        <td><b>${e.cliente}</b>${telDaEntrega(e)?`<br><span style="font-size:12px;font-weight:700">Tel: ${telDaEntrega(e)}</span>`:''}${e.end?`<br><span style="font-size:11px;color:#5A6A8A">${e.end}</span>`:''}</td>
+        <td><b>${e.cliente}</b>${telDaEntrega(e)?`<br><span style="font-size:12px;font-weight:700">Tel: ${telDaEntrega(e)}</span>`:''}${e.end?`<br><span style="font-size:11px;color:#5A6A8A">${e.end}</span>`:''}${vendedoraDaEntrega(e)?`<br><span style="font-size:11px;color:#5A6A8A">Vendedora: <b>${vendedoraDaEntrega(e)}</b></span>`:''}</td>
         <td style="font-size:12px">${e.itens||'—'}</td>
         <td>${venda?`<b style="color:#1A7A4A">R$ ${Number(venda.total).toLocaleString('pt-BR',{minimumFractionDigits:2})}</b><br><span style="font-size:11px;color:#5A6A8A">${venda.pgto}</span>`:'—'}</td>
         <td><span class="status-badge ${clsSt[e.status]||'badge-ag'}">${lblSt[e.status]||e.status}</span></td>
@@ -3910,6 +3970,7 @@ function imprimirEntrega(id){
       ${telDaEntrega(e)?`<div style="font-size:12.5px;margin-top:2px">Telefone: <b>${telDaEntrega(e)}</b></div>`:''}
       <div style="color:#5A6A8A;font-size:12.5px;margin-top:2px">${e.end||'Endereço não informado'}</div>
       <div style="margin-top:8px;font-size:12.5px">Data agendada: <b>${e.data}</b> &nbsp;·&nbsp; Período: <b>${e.periodo}</b> &nbsp;·&nbsp; Status: <b>${lblSt[e.status]||e.status}</b></div>
+      ${vendedoraDaEntrega(e)?`<div style="margin-top:4px;font-size:12.5px">Vendedora: <b>${vendedoraDaEntrega(e)}</b></div>`:''}
       ${ent?`<div style="margin-top:4px;font-size:12.5px">Entregador: <b>${ent.nome}</b>${ent.veiculo?' · '+ent.veiculo:''}${ent.placa?' · '+ent.placa:''}</div>`:''}
       ${e.obs?`<div style="margin-top:4px;font-size:12.5px;color:#5A6A8A">Obs: ${e.obs}</div>`:''}
     </div>
@@ -4263,6 +4324,7 @@ function labelPeriodoTexto(){
 
 // ─── EXPORTAR PDF ─────────────────────────────────────────────────────────────
 function exportarPDF(tipo) {
+  if(modoConsulta && !PDFS_CONSULTA.includes(tipo)) return;
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   const W = 210;
@@ -4379,6 +4441,21 @@ function exportarPDF(tipo) {
       }
     }
     if(tipo==='vendas'){ rodape(doc); doc.save(`relatorio-vendas-${dataHoje.replace(/\//g,'-')}.pdf`); return; }
+  }
+  if(tipo==='estoque') {
+    // Estoque simples: so produto e quantidade (sem custo, preco ou margem)
+    let y = cabecalho('Estoque de Produtos', 'Quantidade em estoque por produto (sem valores)', [30,77,140]);
+    const lista = produtos.slice().sort((a,b)=>a.nome.localeCompare(b.nome));
+    const rotuloTipo = {fabricado:'Fabricado', revenda:'Revenda'};
+    const linhas = [];
+    lista.forEach(p=>{
+      linhas.push([{content:p.nome,styles:{fontStyle:'bold'}}, p.categoria||'', rotuloTipo[p.tipo]||'', {content:String(p.qtd),styles:{halign:'center',fontStyle:'bold'}}]);
+      coresDe(p).forEach(c=>{ const q=Number(c.qtd)||0; linhas.push([{content:'      • '+c.nome,styles:{textColor:[90,106,138],fontSize:8.5}}, '', '', {content:q>0?String(q):'sem estoque',styles:{halign:'center',textColor:q>0?[90,106,138]:[185,28,28],fontSize:8.5}}]); });
+    });
+    doc.autoTable({ startY: y, margin:{left:14,right:14}, head:[['Produto','Categoria','Tipo','Quantidade']], body: linhas,
+      styles:{fontSize:9.5,cellPadding:3}, headStyles:{fillColor:[30,77,140],textColor:255,fontStyle:'bold'}, columnStyles:{3:{cellWidth:30,halign:'center'}} });
+    totalTabela(doc, doc.lastAutoTable.finalY+4, `Total: ${lista.length} produtos`, `${lista.reduce((a,p)=>a+p.qtd,0)} unidades em estoque`);
+    rodape(doc); doc.save(`estoque-produtos-${dataHoje.replace(/\//g,'-')}.pdf`); return;
   }
   if(tipo==='fabricado' || tipo==='completo') {
     if(tipo==='completo' && tipo!=='fabricado') doc.addPage();
@@ -4547,18 +4624,98 @@ async function login(){
   const {data,error}=await sb.auth.signInWithPassword({email:usernameParaEmail(usuario),password:senha});
   if(error){ erro.textContent='Usuário ou senha incorretos.'; erro.style.display='block'; btn.textContent='Entrar'; btn.disabled=false; return; }
   const {data:perfil}=await sb.from('perfis').select('role,nome').eq('id',data.user.id).single();
-  if(!perfil||perfil.role!=='master'){
+  if(!perfil||!['master','consulta'].includes(perfil.role)){
     erro.textContent='Acesso exclusivo ao administrador.'; erro.style.display='block';
     await sb.auth.signOut(); btn.textContent='Entrar'; btn.disabled=false; return;
   }
-  masterUid=data.user.id;
+  masterUid=data.user.id; modoConsulta=perfil.role==='consulta';
   btn.textContent='Entrar'; btn.disabled=false;
   await iniciarApp();
+}
+
+// ─── ACESSO DE CONSULTA (somente leitura) ────────────────────────────────────
+// Gerenciamento (so o master): criar, trocar senha e excluir acessos
+async function chamarAcessoConsulta(payload){
+  const {data:{session}}=await sb.auth.getSession();
+  const resp=await fetch('/api/acesso-consulta',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},
+    body:JSON.stringify(payload)
+  });
+  const out=await resp.json().catch(()=>({}));
+  if(!resp.ok) throw new Error(out.error||'Não foi possível falar com o servidor.');
+  return out;
+}
+async function abrirModalAcessos(){
+  document.getElementById('modal-acessos').classList.add('open');
+  await renderAcessos();
+}
+async function renderAcessos(){
+  const el=document.getElementById('acessos-lista');
+  el.innerHTML='<div style="color:var(--sub);font-size:13px">Carregando...</div>';
+  try{
+    const out=await chamarAcessoConsulta({acao:'listar'});
+    const lista=out.acessos||[];
+    el.innerHTML=lista.length?lista.map(a=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;border:1.5px solid var(--borda);border-radius:10px;padding:10px 12px;margin-bottom:8px">
+      <div><b>${a.nome||'—'}</b><div style="font-size:12px;color:var(--sub)">Usuário: ${String(a.email||'').split('@')[0]}</div></div>
+      <div style="display:flex;gap:6px"><button class="btn btn-sm btn-ghost" onclick="trocarSenhaConsulta('${a.id}')">Trocar senha</button><button class="btn btn-sm" style="background:none;border:1.5px solid var(--borda);color:var(--vm)" onclick="excluirAcessoConsulta('${a.id}')">Excluir</button></div>
+    </div>`).join(''):'<div style="color:var(--sub);font-size:13px">Nenhum acesso de consulta criado ainda.</div>';
+  } catch(e){ el.innerHTML=`<div style="color:var(--vm);font-size:13px">Erro: ${e.message}</div>`; }
+}
+async function criarAcessoConsulta(){
+  const nome=document.getElementById('acesso-nome').value.trim();
+  const usuario=document.getElementById('acesso-usuario').value.trim();
+  const senha=document.getElementById('acesso-senha').value;
+  if(!usuario||!senha){ alert('Informe o usuário e a senha.'); return; }
+  if(senha.length<6){ alert('A senha deve ter ao menos 6 caracteres.'); return; }
+  const btn=document.getElementById('btn-criar-acesso'); btn.disabled=true;
+  try{
+    await chamarAcessoConsulta({acao:'criar',username:usuario,password:senha,nome:nome||usuario});
+    ['acesso-nome','acesso-usuario','acesso-senha'].forEach(id=>{ document.getElementById(id).value=''; });
+    await renderAcessos();
+    alert('Acesso criado! A pessoa entra na mesma página do Master com o usuário "'+usuario.toLowerCase().replace(/[^a-z0-9]/g,'')+'" e a senha informada.');
+  } catch(e){ alert('Erro: '+e.message); }
+  btn.disabled=false;
+}
+async function trocarSenhaConsulta(id){
+  const senha=prompt('Nova senha (mínimo 6 caracteres):');
+  if(senha===null) return;
+  if(senha.length<6){ alert('A senha deve ter ao menos 6 caracteres.'); return; }
+  try{ await chamarAcessoConsulta({acao:'senha',id,newPassword:senha}); alert('Senha alterada.'); }
+  catch(e){ alert('Erro: '+e.message); }
+}
+async function excluirAcessoConsulta(id){
+  if(!confirm('Excluir este acesso? A pessoa não conseguirá mais entrar.')) return;
+  try{ await chamarAcessoConsulta({acao:'excluir',id}); await renderAcessos(); }
+  catch(e){ alert('Erro: '+e.message); }
+}
+
+let modoConsulta = false;
+const ABAS_CONSULTA = ['dashvendas','vendas','entregas','posvenda','campanhas','exportar'];
+const PDFS_CONSULTA = ['vendas','estoque','campanhas'];
+function aplicarModoConsulta(){
+  document.body.classList.add('consulta');
+  document.querySelectorAll('.sidebar-nav button').forEach(b=>{
+    const m=(b.getAttribute('onclick')||'').match(/irAba\('(\w+)'\)/);
+    if(m && !ABAS_CONSULTA.includes(m[1])) b.style.display='none';
+  });
+  document.querySelectorAll('.sidebar-nav .sidebar-sep').forEach(s=>{ s.style.display='none'; });
+  const v=document.querySelector('.sidebar-version'); if(v) v.textContent='Consulta';
+  document.querySelectorAll('#aba-exportar button[onclick^="exportarPDF("]').forEach(b=>{
+    const t=(b.getAttribute('onclick').match(/exportarPDF\('(\w+)'\)/)||[])[1];
+    if(!PDFS_CONSULTA.includes(t)){ const c=b.closest('.card'); if(c) c.style.display='none'; }
+  });
+  // trava extra: qualquer tentativa de gravar e recusada (o banco tambem recusa)
+  const orig=sb.from.bind(sb);
+  const recusa={ select(){return this;}, single(){return this;}, eq(){return this;}, maybeSingle(){return this;},
+    then(res,rej){ return Promise.resolve({data:null,error:{message:'Acesso somente leitura.'}}).then(res,rej); } };
+  sb.from=function(t){ const q=orig(t); ['insert','update','delete','upsert'].forEach(m=>{ q[m]=()=>recusa; }); return q; };
 }
 async function sair(){ await sb.auth.signOut(); location.reload(); }
 
 async function iniciarApp(){
   document.body.classList.add('autenticado');
+  if(modoConsulta) aplicarModoConsulta();
   await carregarTudo();
   aplicarEmpresaNoHeader();
   popularSelectVendedoras();
@@ -4566,6 +4723,7 @@ async function iniciarApp(){
   renderDash();
   popularItens();
   renderCalendario();
+  if(modoConsulta) irAba('dashvendas');
 }
 
 (async ()=>{
@@ -4574,7 +4732,7 @@ async function iniciarApp(){
   const {data:{session}} = await sb.auth.getSession();
   if(session){
     const {data:perfil} = await sb.from('perfis').select('role').eq('id',session.user.id).single();
-    if(perfil?.role==='master'){ masterUid=session.user.id; await iniciarApp(); }
+    if(perfil?.role==='master' || perfil?.role==='consulta'){ masterUid=session.user.id; modoConsulta=perfil.role==='consulta'; await iniciarApp(); }
     else await sb.auth.signOut();
   }
   document.getElementById('login-senha').addEventListener('keydown', e=>{ if(e.key==='Enter') login(); });
