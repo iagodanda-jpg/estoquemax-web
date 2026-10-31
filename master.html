@@ -4323,6 +4323,49 @@ function labelPeriodoTexto(){
 }
 
 // ─── EXPORTAR PDF ─────────────────────────────────────────────────────────────
+// Cidade da venda (sem acento/caixa para agrupar "Goiania" e "goiânia" juntas)
+function cidadeDaVenda(v){
+  const c=String(v.endCidade||'').trim().replace(/\s+/g,' ');
+  if(!c) return 'Não informada';
+  return c.toLowerCase().split(' ').map((p,i)=>(i>0&&['de','da','do','das','dos','e'].includes(p))?p:p.charAt(0).toUpperCase()+p.slice(1)).join(' ');
+}
+function chaveCidade(nome){ return nome.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase(); }
+// Grafico de barras horizontais (vendas por cidade) desenhado direto no PDF; devolve o novo y
+function graficoVendasPorCidade(doc, y, lista){
+  const W=210, mapa={};
+  lista.forEach(v=>{
+    const nome=cidadeDaVenda(v), k=chaveCidade(nome);
+    const o=mapa[k]=mapa[k]||{nome,total:0,qtd:0};
+    o.total+=v.total; o.qtd++;
+  });
+  let cidades=Object.values(mapa).sort((a,b)=>b.total-a.total);
+  const MAX=12;
+  if(cidades.length>MAX+1){
+    const resto=cidades.slice(MAX);
+    cidades=cidades.slice(0,MAX).concat([{nome:'Outras ('+resto.length+' cidades)',total:resto.reduce((a,c)=>a+c.total,0),qtd:resto.reduce((a,c)=>a+c.qtd,0)}]);
+  }
+  const totalGeral=lista.reduce((a,v)=>a+v.total,0)||1;
+  const altLinha=8, altura=16+cidades.length*altLinha+4;
+  if(y+altura>280){ doc.addPage(); y=20; }
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(30,40,64);
+  doc.text('Vendas por Cidade', 14, y); y+=3;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(90,106,138);
+  doc.text('Valor vendido (sem canceladas) e % do total no período', 14, y+3); y+=8;
+  const xBarra=62, larguraMax=60, maxVal=Math.max(...cidades.map(c=>c.total),1);
+  cidades.forEach((c,i)=>{
+    const yl=y+i*altLinha;
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(30,40,64);
+    const nome=doc.splitTextToSize(c.nome, 46)[0];
+    doc.text(nome, 14, yl+4.5);
+    doc.setFillColor(229,231,235); doc.roundedRect(xBarra, yl, larguraMax, 5.5, 1.2, 1.2, 'F');
+    const cor=c.nome==='Não informada'?[156,163,175]:(i===0?[26,122,74]:[30,77,140]);
+    doc.setFillColor(cor[0],cor[1],cor[2]);
+    doc.roundedRect(xBarra, yl, Math.max(1.5, c.total/maxVal*larguraMax), 5.5, 1.2, 1.2, 'F');
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(30,40,64);
+    doc.text(fmtR(c.total)+'  ·  '+(c.total/totalGeral*100).toFixed(1).replace('.',',')+'%  ·  '+c.qtd+' venda(s)', xBarra+larguraMax+3, yl+4.2);
+  });
+  return y+cidades.length*altLinha+6;
+}
 function exportarPDF(tipo) {
   if(modoConsulta && !PDFS_CONSULTA.includes(tipo)) return;
   const { jsPDF } = window.jspdf;
@@ -4387,6 +4430,7 @@ function exportarPDF(tipo) {
       doc.text(`Cancelados: ${vendasCanceladas.length} venda(s) — ${fmtR(totalCancelado)} (não contabilizado nos totais)`, 16, y+6.5);
       y += 16;
     } else y += 4;
+    if(vendasFiltradas.length) y = graficoVendasPorCidade(doc, y, vendasFiltradas);
     if(!vendasFiltradas.length && !vendasCanceladas.length){
       doc.setFontSize(11); doc.setFont('helvetica','normal'); doc.setTextColor(90,106,138);
       doc.text('Nenhuma venda encontrada no período selecionado.', 14, y);
@@ -4405,14 +4449,14 @@ function exportarPDF(tipo) {
         doc.text(`Vendedora: ${nomeVend}`, 14, y);
         if(vend){ doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(90,106,138); doc.text(`Comissão: ${comissaoPct}% | Base: vendas recebidas`, 14, y+5); }
         y += vend ? 10 : 7;
-        doc.autoTable({ startY:y, margin:{left:14,right:14}, head:[['#','Data','Cliente','Itens','Total','Taxa Maq.','Líquido','Pgto','Status']],
+        doc.autoTable({ startY:y, margin:{left:14,right:14}, head:[['#','Data','Cliente','Cidade','Itens','Total','Taxa Maq.','Líquido','Pgto','Status']],
           body:lista.map(v=>{ const temTaxa=(v.taxaPct||0)>0;
-            return ['#'+v.id,v.data,v.cliente,(v.itens||[]).map(i=>i.qtd+'x '+i.nome).join(', '), fmtR(v.total),
+            return ['#'+v.id,v.data,v.cliente,cidadeDaVenda(v)==='Não informada'?'—':cidadeDaVenda(v),(v.itens||[]).map(i=>i.qtd+'x '+i.nome).join(', '), fmtR(v.total),
               temTaxa?`${v.taxaPct.toFixed(2).replace('.',',')}%`:'—', temTaxa?fmtR(v.valorLiquido||v.total):'—',
               v.pgtoRecebido==='sim'?'Recebido':'Pendente', v.status.charAt(0).toUpperCase()+v.status.slice(1)]; }),
           styles:{fontSize:7.5,cellPadding:2.5}, headStyles:{fillColor:[30,77,140],textColor:255,fontStyle:'bold'},
           alternateRowStyles:{fillColor:[240,244,248]},
-          didParseCell(data){ if(data.column.index===7&&data.row.section==='body'){ data.cell.styles.textColor=data.cell.raw==='Recebido'?[26,122,74]:[180,83,9]; } }
+          didParseCell(data){ if(data.column.index===8&&data.row.section==='body'){ data.cell.styles.textColor=data.cell.raw==='Recebido'?[26,122,74]:[180,83,9]; } }
         });
         y = doc.lastAutoTable.finalY+4;
         doc.setFillColor(240,244,248); doc.rect(14,y,W-28,22,'F');
@@ -4431,9 +4475,9 @@ function exportarPDF(tipo) {
         if(y > 230){ doc.addPage(); y = 20; }
         doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(153,27,27);
         doc.text(`Vendas Canceladas (${vendasCanceladas.length}) — não contabilizadas nos totais acima`, 14, y); y+=6;
-        doc.autoTable({ startY:y, margin:{left:14,right:14}, head:[['#','Data','Cliente','Vendedora','Itens','Valor (não contado)']],
+        doc.autoTable({ startY:y, margin:{left:14,right:14}, head:[['#','Data','Cliente','Cidade','Vendedora','Itens','Valor (não contado)']],
           body:vendasCanceladas.map(v=>{ const vend=vendedoras.find(x=>x.id==v.vendedoraId);
-            return ['#'+v.id,v.data,v.cliente,vend?vend.nome:'—',(v.itens||[]).map(i=>i.qtd+'x '+i.nome).join(', '), fmtR(v.total)]; }),
+            return ['#'+v.id,v.data,v.cliente,cidadeDaVenda(v)==='Não informada'?'—':cidadeDaVenda(v),vend?vend.nome:'—',(v.itens||[]).map(i=>i.qtd+'x '+i.nome).join(', '), fmtR(v.total)]; }),
           styles:{fontSize:7.5,cellPadding:2.5,textColor:[153,27,27]}, headStyles:{fillColor:[185,28,28],textColor:255,fontStyle:'bold'},
           alternateRowStyles:{fillColor:[254,242,242]}
         });
