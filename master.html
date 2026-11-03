@@ -4428,7 +4428,7 @@ function infoEntregaVenda(v){
   const ents=entregas.filter(x=>x.vendaId==v.id && x.tipo!=='posvenda' && x.status!=='cancelado').sort((a,b)=>b.id-a.id);
   const feita=ents.find(x=>x.status==='entregue');
   if(feita) return {data:String(feita.entregueEm||feita.dataISO||'').slice(0,10), presumida:false};
-  if(v.status==='entregue') return {data:String(v.previsaoISO||v.dataISO||'').slice(0,10), presumida:false};
+  if(v.status==='entregue') return {data:String((ents[0]&&ents[0].dataISO)||v.previsaoISO||v.dataISO||'').slice(0,10), presumida:false};
   if(ents[0] && ents[0].dataISO && ents[0].dataISO<=hojeISO()) return {data:ents[0].dataISO, presumida:true};
   return {data:'', presumida:false};
 }
