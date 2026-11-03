@@ -945,6 +945,20 @@
 </div>
 
 <!-- MODAL DATA DA ENTREGA REALIZADA -->
+<div class="overlay" id="modal-data-recebimento">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header"><h2>Data do recebimento</h2><button onclick="cancelarDataRecebimento()">&times;</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Em que dia o pagamento foi recebido?</label><input id="dr-data" type="date"></div>
+      <div style="font-size:12px;color:var(--sub)">Já vem com a data da entrega (ou de hoje). Se o dinheiro entrou em outro dia, mude aqui — assim o relatório mostra o dia certo mesmo que você só registre depois.</div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+        <button class="btn btn-ghost" onclick="cancelarDataRecebimento()">Cancelar</button>
+        <button class="btn btn-success" onclick="confirmarDataRecebimento()">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="modal-data-entrega">
   <div class="modal" style="max-width:380px">
     <div class="modal-header"><h2>Data da entrega</h2><button onclick="cancelarDataEntrega()">&times;</button></div>
@@ -3491,7 +3505,14 @@ async function salvarVenda(){
   const vendaAnterior = editandoVenda ? vendas.find(v=>v.id===editandoVenda) : null;
   const isNova = !editandoVenda;
   const pgtoRecebidoNovo=document.getElementById('v-pgto-recebido').value;
-  const dataRecebimento = pgtoRecebidoNovo==='sim' ? (vendaAnterior?.pgtoRecebido==='sim' ? (vendaAnterior.dataRecebimento||hojeISO()) : hojeISO()) : null;
+  let dataRecebimento = pgtoRecebidoNovo==='sim' ? (vendaAnterior?.pgtoRecebido==='sim' ? (vendaAnterior.dataRecebimento||hojeISO()) : hojeISO()) : null;
+  // Pagamento passando a "recebido": pergunta o dia em que o dinheiro realmente entrou (nao o dia em que alguem marcou no sistema)
+  if(pgtoRecebidoNovo==='sim' && vendaAnterior?.pgtoRecebido!=='sim'){
+    const sugestao = vendaAnterior ? (dataEntregaVenda(vendaAnterior)||hojeISO()) : (document.getElementById('v-data').value||hojeISO());
+    const d = await pedirDataRecebimento(sugestao);
+    if(!d) return;
+    dataRecebimento = d;
+  }
   const obj={
     cliente, tel:document.getElementById('v-tel').value, cpf:document.getElementById('v-cpf').value,
     endRua, endNum, endCidade, endEstado,
@@ -3541,9 +3562,28 @@ async function salvarVenda(){
   btn.disabled=false;
   fecharModal('venda'); renderVendas(); renderProd(); renderDash(); renderEntregas(); renderCalendario();
 }
+function pedirDataRecebimento(sugestaoISO){
+  return new Promise(resolve=>{
+    const campo=document.getElementById('dr-data');
+    campo.max=hojeISO(); campo.value=(sugestaoISO && sugestaoISO<=hojeISO()) ? sugestaoISO : hojeISO();
+    window.__drResolve=resolve;
+    document.getElementById('modal-data-recebimento').classList.add('open');
+  });
+}
+function confirmarDataRecebimento(){
+  const v=document.getElementById('dr-data').value;
+  if(!v){ alert('Informe a data do recebimento.'); return; }
+  if(v>hojeISO()){ alert('A data do recebimento não pode ser no futuro.'); return; }
+  fecharModal('data-recebimento'); if(window.__drResolve) window.__drResolve(v);
+}
+function cancelarDataRecebimento(){ fecharModal('data-recebimento'); if(window.__drResolve) window.__drResolve(null); }
 async function mudarPgtoRecebido(id,valor){
   const v=vendas.find(x=>x.id===id);
-  const dataRecebimento = valor==='sim' ? (v?.dataRecebimento || hojeISO()) : null;
+  let dataRecebimento = null;
+  if(valor==='sim'){
+    dataRecebimento = await pedirDataRecebimento((v&&dataEntregaVenda(v)) || hojeISO());
+    if(!dataRecebimento){ renderVendas(); return; } // cancelou: volta o seletor pra como estava
+  }
   const {error}=await sb.from('vendas').update({pgto_recebido:valor, data_recebimento:dataRecebimento}).eq('id',id);
   if(error){ alert('Erro: '+error.message); return; }
   vendas=vendas.map(x=>x.id===id?{...x,pgtoRecebido:valor,dataRecebimento:dataRecebimento||''}:x);

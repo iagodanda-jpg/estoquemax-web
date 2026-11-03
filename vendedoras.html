@@ -537,6 +537,23 @@ function renderMeta(ativas){
     </div>`}
   </div>`;
 }
+// Entregas das vendas (so as do tipo entrega, nao canceladas) agrupadas por venda
+async function carregarEntregasDasVendas(vs){
+  const ids=(vs||[]).map(v=>v.id); if(!ids.length) return {};
+  const {data}=await sb.from('entregas').select('id,venda_id,status,data_entrega,entregue_em,tipo').in('venda_id',ids);
+  const m={};
+  (data||[]).filter(e=>e.tipo!=='posvenda' && e.status!=='cancelado').forEach(e=>{ (m[e.venda_id]=m[e.venda_id]||[]).push(e); });
+  return m;
+}
+// Data da entrega: com baixa = data real; so "agendada" com data ja passada = presumida (marcada com *)
+function infoEntregaV(v, m){
+  const l=(m[v.id]||[]).slice().sort((a,b)=>b.id-a.id);
+  const f=l.find(x=>x.status==='entregue');
+  if(f) return {data:String(f.entregue_em||f.data_entrega||'').slice(0,10), presumida:false};
+  if(v.status==='entregue') return {data:String((l[0]&&l[0].data_entrega)||v.previsao_iso||v.data_venda||'').slice(0,10), presumida:false};
+  if(l[0] && l[0].data_entrega && l[0].data_entrega<=hojeISO()) return {data:String(l[0].data_entrega).slice(0,10), presumida:true};
+  return {data:'', presumida:false};
+}
 async function cD(){
   if(!pid) return;
   const {data:vs}=await sb.from('vendas').select('*').eq('perfil_vendedora_id',pid).order('criado_em',{ascending:false});
@@ -571,14 +588,16 @@ async function cD(){
     }
   }
   const mesSel=selMes.value;
-  const recebidosMes=ativas.filter(v=>v.pgto_recebido==='sim' && String(v.data_recebimento||v.data_venda||v.criado_em||'').slice(0,7)===mesSel);
+  // Comissao: vendas ENTREGUES no mes escolhido (pela data da entrega) e com pagamento recebido - mesmo criterio do Master
+  const entsMap=await carregarEntregasDasVendas(ativas);
+  const recebidosMes=ativas.filter(v=>v.pgto_recebido==='sim' && infoEntregaV(v,entsMap).data.slice(0,7)===mesSel);
   const recebido=recebidosMes.reduce((a,v)=>a+Number(v.total||0),0);
   const comissaoValor=recebido*(vcomissao/100);
   document.getElementById('kg').innerHTML=[
     {l:'Vendas Mês',v:dm.length,s:fR(dm.reduce((a,v)=>a+Number(v.total||0),0)),c:'#2E6BC4'},
     {l:'Entregues no Mês',v:entreguesMes,s:'vendas entregues neste mês',c:'#1A7A4A'},
     {l:'Aguardando Entrega',v:aguardando.length,s:'ainda não entregues',c:'#B45309'},
-    {l:'Comissão do Mês',v:fR(comissaoValor),s:vcomissao+'% sobre '+fR(recebido)+' recebidos no mês selecionado',c:'#1E4D8C'}
+    {l:'Comissão do Mês',v:fR(comissaoValor),s:vcomissao+'% sobre '+fR(recebido)+' em vendas entregues e pagas no mês selecionado',c:'#1E4D8C'}
   ].map(k=>`<div style="background:#fff;border-radius:12px;border:1.5px solid var(--borda);padding:14px;border-left:4px solid ${k.c}"><div style="font-size:10px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">${k.l}</div><div style="font-size:20px;font-weight:800">${k.v}</div><div style="font-size:11px;color:var(--sub);margin-top:3px">${k.s}</div></div>`).join('');
   document.getElementById('uv').innerHTML=l.slice(0,5).map(v=>`<div class="vi"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><div><b>${v.cliente}</b><div style="font-size:11px;color:var(--sub)">${new Date(v.data_venda||v.criado_em).toLocaleDateString('pt-BR')}</div></div><b style="color:var(--verde)">${fR(v.total)}</b></div><span class="badge" style="background:${CL[v.status]||'#DBEAFE'}">${LB[v.status]||v.status}</span></div>`).join('')||'<div style="text-align:center;color:var(--sub);padding:20px">Nenhuma venda</div>';
 }
@@ -948,25 +967,28 @@ async function exportarResumoMesPDF(){
     const {data:vs,error}=await sb.from('vendas').select('*').eq('perfil_vendedora_id',pid).order('criado_em',{ascending:true});
     if(error){ alert('Erro ao buscar suas vendas: '+error.message); return; }
     const todas=vs||[];
+    const entsMap=await carregarEntregasDasVendas(todas.filter(v=>v.status!=='cancelado'));
     const dataDe=v=>String(v.data_venda||v.criado_em||'').slice(0,10);
-    const dataRec=v=>String(v.data_recebimento||v.data_venda||v.criado_em||'').slice(0,10);
+    const entr=v=>infoEntregaV(v,entsMap);
     const doMes=todas.filter(v=>v.status!=='cancelado' && dataDe(v).slice(0,7)===mes).sort((a,b)=>dataDe(a).localeCompare(dataDe(b)));
     const canceladas=todas.filter(v=>v.status==='cancelado' && dataDe(v).slice(0,7)===mes).length;
-    const recebidas=todas.filter(v=>v.status!=='cancelado' && v.pgto_recebido==='sim' && dataRec(v).slice(0,7)===mes).sort((a,b)=>dataRec(a).localeCompare(dataRec(b)));
+    // Comissao: vendas ENTREGUES no mes (pela data da entrega) e com pagamento recebido - mesmo criterio do Master
+    const entregues=todas.filter(v=>v.status!=='cancelado' && v.pgto_recebido==='sim' && entr(v).data.slice(0,7)===mes).sort((a,b)=>entr(a).data.localeCompare(entr(b).data));
     const vendido=doMes.reduce((a,v)=>a+Number(v.total||0),0);
-    const recebido=recebidas.reduce((a,v)=>a+Number(v.total||0),0);
-    const comissao=recebido*(vcomissao/100);
+    const base=entregues.reduce((a,v)=>a+Number(v.total||0),0);
+    const comissao=base*(vcomissao/100);
     const aReceber=doMes.filter(v=>v.pgto_recebido!=='sim').reduce((a,v)=>a+Number(v.total||0),0);
+    const presumidas=entregues.filter(v=>entr(v).presumida);
     const mesLbl=new Date(mes+'-01T12:00:00').toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
     const { jsPDF } = window.jspdf;
     const doc=new jsPDF();
     let y=cabecalhoPDF(doc,'Resumo do Mês - '+mesLbl, 'Vendedor(a): '+(vnome||'-')+' · emitido em '+new Date().toLocaleString('pt-BR'));
     const resumo=[
-      ['Vendas no mês', doMes.length+' venda(s) · '+fR(vendido)],
+      ['Vendas feitas no mês', doMes.length+' venda(s) · '+fR(vendido)],
       ['Ticket médio', doMes.length?fR(vendido/doMes.length):'—'],
       ['Ainda a receber das vendas do mês', fR(aReceber)],
-      ['Recebido no mês', fR(recebido)+' ('+recebidas.length+' venda(s))'],
-      ['Comissão ('+vcomissao+'% sobre o recebido)', fR(comissao)]
+      ['Vendas entregues e pagas no mês (base da comissão)', fR(base)+' ('+entregues.length+' venda(s))'],
+      ['Comissão ('+vcomissao+'% sobre as vendas entregues e pagas)', fR(comissao)]
     ];
     if(vmeta>0) resumo.splice(1,0,['Meta mensal', fR(vmeta)+' · atingido '+(vendido/vmeta*100).toFixed(0)+'%']);
     if(canceladas) resumo.push(['Vendas canceladas (não contam)', String(canceladas)]);
@@ -974,23 +996,27 @@ async function exportarResumoMesPDF(){
       styles:{fontSize:10,cellPadding:3.5}, columnStyles:{0:{fontStyle:'bold',fillColor:[240,244,248],cellWidth:78}} });
     y=doc.lastAutoTable.finalY+9;
     doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(30,40,64);
-    doc.text('Vendas do mês', 14, y); y+=3;
+    doc.text('Vendas feitas no mês', 14, y); y+=3;
     doc.autoTable({ startY:y, margin:{left:14,right:14},
-      head:[['Data','Cliente','Total','Pgto','Status','Recebido']],
-      body: doMes.length?doMes.map(v=>[dBR(dataDe(v)), v.cliente, fR(v.total), v.pgto||'', LB[v.status]||v.status, v.pgto_recebido==='sim'?('Sim · '+dBR(dataRec(v))):'Não']):[['Nenhuma venda neste mês','','','','','']],
+      head:[['Data','Cliente','Total','Pgto','Pago','Entregue em']],
+      body: doMes.length?doMes.map(v=>{ const e=entr(v); return [dBR(dataDe(v)), v.cliente, fR(v.total), v.pgto||'', v.pgto_recebido==='sim'?'Sim':'Não', e.data?dBR(e.data)+(e.presumida?' *':''):'—']; }):[['Nenhuma venda neste mês','','','','','']],
       foot: doMes.length?[['','Total',fR(vendido),'','','']]:undefined,
       styles:{fontSize:9,cellPadding:3}, headStyles:{fillColor:[30,77,140],textColor:255,fontStyle:'bold'},
       footStyles:{fillColor:[240,244,248],textColor:[30,40,64],fontStyle:'bold'}, alternateRowStyles:{fillColor:[248,250,252]} });
     y=doc.lastAutoTable.finalY+9;
     if(y>250){ doc.addPage(); y=20; }
     doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(30,40,64);
-    doc.text('Comissão - vendas recebidas no mês', 14, y); y+=3;
+    doc.text('Comissão - vendas entregues e pagas no mês', 14, y); y+=3;
     doc.autoTable({ startY:y, margin:{left:14,right:14},
-      head:[['Recebido em','Cliente','Venda de','Valor recebido','Comissão']],
-      body: recebidas.length?recebidas.map(v=>[dBR(dataRec(v)), v.cliente, dBR(dataDe(v)), fR(v.total), fR(Number(v.total||0)*vcomissao/100)]):[['Nenhum recebimento neste mês','','','','']],
-      foot: recebidas.length?[['','','Total',fR(recebido),fR(comissao)]]:undefined,
+      head:[['Entregue em','Cliente','Venda de','Valor da venda','Comissão']],
+      body: entregues.length?entregues.map(v=>[dBR(entr(v).data)+(entr(v).presumida?' *':''), v.cliente, dBR(dataDe(v)), fR(v.total), fR(Number(v.total||0)*vcomissao/100)]):[['Nenhuma venda entregue e paga neste mês','','','','']],
+      foot: entregues.length?[['','','Total',fR(base),fR(comissao)]]:undefined,
       styles:{fontSize:9,cellPadding:3}, headStyles:{fillColor:[26,122,74],textColor:255,fontStyle:'bold'},
       footStyles:{fillColor:[240,244,248],textColor:[30,40,64],fontStyle:'bold'}, alternateRowStyles:{fillColor:[248,250,252]} });
+    if(presumidas.length || todas.some(v=>v.status!=='cancelado' && doMes.includes(v) && entr(v).presumida)){
+      doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(90,106,138);
+      doc.text('* Entrega só agendada no sistema (sem baixa como Entregue): considerada entregue na data agendada.', 14, doc.lastAutoTable.finalY+5);
+    }
     rodapePDF(doc);
     await entregarPDF(doc, 'resumo-'+mes+'-'+(vnome||'vendedora').toLowerCase().replace(/[^a-z0-9]/g,'-')+'.pdf', 'Resumo do mês');
   } finally { btn.textContent=txt; btn.disabled=false; }
