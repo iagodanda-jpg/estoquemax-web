@@ -250,7 +250,7 @@
   body.consulta [onclick*="editar"], body.consulta [onclick*="excluir"], body.consulta [onclick*="salvar"],
   body.consulta [onclick*="alternarAtivo"], body.consulta [onclick*="agendarEntrega"], body.consulta [onclick*="sincronizarPrazos"],
   body.consulta [onclick*="cancelarDataEntrega"], body.consulta [onclick*="confirmarDataEntrega"],
-  body.consulta #alerta-sidebar, body.consulta #alerta-topbar, body.consulta #btn-alerta-aba { display:none !important; }
+  body.consulta #alerta-sidebar, body.consulta #alerta-topbar, body.consulta #btn-alerta-aba, body.consulta .so-master { display:none !important; }
   body.consulta select[onchange*="mudar"] { pointer-events:none; appearance:none; -webkit-appearance:none; border-color:transparent !important; background:transparent !important; font-weight:700; }
 </style>
 </head>
@@ -625,6 +625,15 @@
       </button>
     </div>
     <div class="kpi-grid" id="kpi-entregas"></div>
+    <div id="barra-sel-entregas" style="display:none;position:sticky;top:0;z-index:20;background:#1A2540;color:#fff;border-radius:12px;padding:10px 14px;margin-bottom:12px;gap:10px;align-items:center;flex-wrap:wrap;box-shadow:0 4px 14px rgba(0,0,0,.25)">
+      <b id="sel-entregas-n" style="margin-right:4px"></b>
+      <span class="so-master" style="display:flex;gap:6px;align-items:center">
+        <select id="sel-entregador" style="border:none;border-radius:8px;padding:6px 8px;font-size:12.5px;color:#1A2540"></select>
+        <button class="btn btn-sm" style="background:#2E6BC4;color:#fff" onclick="salvarEntregadorSelecionadas()">Atribuir entregador</button>
+      </span>
+      <button class="btn btn-sm" style="background:#22A05B;color:#fff" onclick="gerarRomaneioSelecionadas()">🖨 Gerar romaneio das selecionadas</button>
+      <button class="btn btn-sm" style="background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.6)" onclick="limparSelEntregas()">Limpar seleção</button>
+    </div>
     <div class="card" style="margin-bottom:18px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
         <div style="font-weight:700;font-size:15px;display:flex;align-items:center;gap:7px">
@@ -643,6 +652,7 @@
     <div class="tbl-wrap">
       <table>
         <thead><tr>
+          <th style="width:30px"><input type="checkbox" id="sel-todas-entregas" onchange="selecionarTodasTabelaEntregas(this.checked)" title="Selecionar todas as entregas listadas"></th>
           <th onclick="ordenarEntregas('id')" style="cursor:pointer;user-select:none">#<span id="sa-e-id"></span></th>
           <th onclick="ordenarEntregas('data')" style="cursor:pointer;user-select:none">Data<span id="sa-e-data"></span></th>
           <th onclick="ordenarEntregas('periodo')" style="cursor:pointer;user-select:none">Período<span id="sa-e-periodo"></span></th>
@@ -765,6 +775,21 @@
         <div style="font-weight:700;font-size:15px;margin-bottom:4px">Relatório de Vendas</div>
         <div style="color:var(--sub);font-size:13px;margin-bottom:16px">Vendas por vendedora com comissões, totais recebidos e pendentes — filtradas pelo período.</div>
         <button class="btn" style="background:#22A05B;color:#fff;display:flex;align-items:center;gap:6px" onclick="exportarPDF('vendas')">Exportar PDF</button>
+      </div>
+      <div class="card" style="border-left:5px solid #15803D">
+        <div style="font-weight:700;font-size:15px;margin-bottom:4px">Vendas por Vendedora</div>
+        <div style="color:var(--sub);font-size:13px;margin-bottom:12px">Relatório de vendas de uma vendedora só (com cidade, gráfico por cidade e comissão), no período selecionado acima.</div>
+        <select id="pdf-vendedora" style="width:100%;margin-bottom:12px;border:1.5px solid var(--borda);border-radius:8px;padding:8px 10px;font-size:13px"></select>
+        <button class="btn" style="background:#15803D;color:#fff" onclick="exportarPDF('vendas_vendedora')">Exportar PDF</button>
+      </div>
+      <div class="card" style="border-left:5px solid #1E4D8C">
+        <div style="font-weight:700;font-size:15px;margin-bottom:4px">Comissões das Vendedoras</div>
+        <div style="color:var(--sub);font-size:13px;margin-bottom:12px">Consolidado de comissões (sobre o que foi <b>recebido</b> no período). Dá para emitir também o recibo de prestação de serviços de cada vendedora, com anexo das vendas e linhas de assinatura.</div>
+        <select id="pdf-comissao-vendedora" style="width:100%;margin-bottom:12px;border:1.5px solid var(--borda);border-radius:8px;padding:8px 10px;font-size:13px"></select>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <button class="btn btn-primary" onclick="exportarPDF('comissoes')">Só o consolidado</button>
+          <button class="btn" style="background:#1A2540;color:#fff" onclick="exportarPDF('comissoes_docs')">Consolidado + prestação de serviço</button>
+        </div>
       </div>
       <div class="card" style="border-left:5px solid #0E9AA7">
         <div style="font-weight:700;font-size:15px;margin-bottom:4px">Estoque de Produtos (sem valores)</div>
@@ -2695,6 +2720,10 @@ function popularSelectVendedoras(incluirId){
   const el=document.getElementById('v-vendedora'); if(el) el.innerHTML=opts;
   const filtro=document.getElementById('filtro-venda-vendedora');
   if(filtro) filtro.innerHTML='<option value="todas">Todas as vendedoras</option>'+vendedoras.map(v=>`<option value="${v.id}">${v.nome}</option>`).join('');
+  const pdfV=document.getElementById('pdf-vendedora');
+  if(pdfV) pdfV.innerHTML='<option value="">— Escolha a vendedora —</option>'+vendedoras.map(v=>`<option value="${v.id}">${v.nome}${vendedoraAtiva(v)?'':' (inativa)'}</option>`).join('');
+  const pdfC=document.getElementById('pdf-comissao-vendedora');
+  if(pdfC) pdfC.innerHTML='<option value="">Todas as vendedoras</option>'+vendedoras.filter(v=>Number(v.comissao)>0).map(v=>`<option value="${v.id}">${v.nome}${vendedoraAtiva(v)?'':' (inativa)'}</option>`).join('');
   const filtroEnt=document.getElementById('filtro-entrega-vendedora');
   if(filtroEnt) filtroEnt.innerHTML='<option value="todas">Todas as vendedoras</option>'+vendedoras.map(v=>`<option value="${v.id}">${v.nome}</option>`).join('');
 }
@@ -3633,6 +3662,7 @@ function trEntrega(e){
   const vend=vendaLig?.vendedoraId?vendedoras.find(x=>x.id==vendaLig.vendedoraId):null;
   const posv=e.tipo==='posvenda';
   return `<tr${posv?' style="background:#F5F3FF"':''}>
+    <td><input type="checkbox" data-sel-ent="${e.id}"${selEntregas.has(e.id)?' checked':''} onchange="toggleSelEntrega(${e.id})"></td>
     <td style="color:var(--sub)">#${e.id}</td><td><b>${e.data}</b></td><td>${badge(e.periodo,'badge-cinza')}</td>
     <td><b>${e.cliente}</b></td><td style="font-size:12px;color:var(--sub);max-width:130px">${e.end||'—'}</td>
     <td style="font-size:12px;color:var(--sub)">${e.itens||'—'}</td>
@@ -3691,7 +3721,7 @@ function renderEntregas(){
     if(el) el.textContent = sortEntregas.col===c ? (sortEntregas.dir===1?' ▲':' ▼') : '';
   });
   const tbody=document.getElementById('tbody-entregas');
-  if(!lista.length){ tbody.innerHTML=`<tr><td colspan="12" class="sem-dados">Nenhuma entrega agendada.</td></tr>`; return; }
+  if(!lista.length){ tbody.innerHTML=`<tr><td colspan="13" class="sem-dados">Nenhuma entrega agendada.</td></tr>`; return; }
   tbody.innerHTML=lista.map(trEntrega).join('');
 }
 function renderCalendario(){
@@ -3702,19 +3732,20 @@ function renderCalendario(){
   let html='';
   for(let d=0;d<7;d++){
     const dia=new Date(inicioSemana); dia.setDate(inicioSemana.getDate()+d);
-    const diaISO=dia.toISOString().slice(0,10);
+    const diaISO=isoLocal(dia);
     const isHoje=dia.getTime()===hoje2.getTime();
     const entsDia=entregas.filter(e=>e.dataISO===diaISO && entregaVisivel(e));
     const corBg=isHoje?'#EFF6FF':entsDia.length>0?'#F0FDF4':'#fff';
     const corBorda=isHoje?'var(--azul)':entsDia.length>0?'var(--verde)':'var(--borda)';
     html+=`<div style="background:${corBg};border:2px solid ${corBorda};border-radius:10px;padding:8px;min-height:90px;cursor:pointer" onclick="filtrarDia('${diaISO}')">
-      <div style="font-size:11px;font-weight:700;color:var(--sub);margin-bottom:2px">${dias[d]}</div>
+      <div style="font-size:11px;font-weight:700;color:var(--sub);margin-bottom:2px;display:flex;justify-content:space-between;align-items:center">${dias[d]}${entsDia.length?`<span title="Selecionar/limpar todas as entregas deste dia" onclick="event.stopPropagation();selecionarDiaEntregas('${diaISO}')" style="cursor:pointer;font-size:10px;font-weight:700;color:var(--azul);background:#DBEAFE;border-radius:4px;padding:1px 5px">☑ dia</span>`:''}</div>
       <div style="font-size:18px;font-weight:800;color:${isHoje?'var(--azul)':'var(--txt)'};margin-bottom:4px">${dia.getDate()}</div>
       ${entsDia.map(e=>{
         const posv=e.tipo==='posvenda';
         const bg=posv?'#EDE9FE':(e.status==='entregue'?'#DCFCE7':e.status==='em_rota'?'#FEF9C3':'#DBEAFE');
         const cor=posv?'#6D28D9':'inherit';
-        return `<div style="background:${bg};color:${cor};border-radius:4px;padding:2px 5px;font-size:10px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:${posv?'700':'400'}" title="${posv?'Pós-venda: ':''}${e.cliente}">${posv?'🔧 ':e.periodo[0]+' · '}${e.cliente.split(' ')[0]}</div>`;
+        const sel=selEntregas.has(e.id);
+        return `<div onclick="event.stopPropagation();toggleSelEntrega(${e.id})" style="background:${sel?'#1A2540':bg};color:${sel?'#fff':cor};outline:${sel?'2px solid #22A05B':'none'};border-radius:4px;padding:2px 5px;font-size:10px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:${posv||sel?'700':'400'};cursor:pointer" title="${sel?'Selecionada — clique para tirar':'Clique para selecionar para o romaneio'}: ${posv?'Pós-venda: ':''}${e.cliente}">${sel?'✔ ':''}${posv?'🔧 ':e.periodo[0]+' · '}${e.cliente.split(' ')[0]}</div>`;
       }).join('')}
       ${entsDia.length===0?`<div style="font-size:11px;color:var(--borda)">livre</div>`:''}
     </div>`;
@@ -3723,13 +3754,64 @@ function renderCalendario(){
   document.getElementById('semana-label').textContent = inicioSemana.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'})+' – '+fim.toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'});
   document.getElementById('calendario-semana').innerHTML=html;
 }
+// ─── SELEÇÃO DE ENTREGAS (calendário/tabela) PARA ROMANEIO ───────────────────
+const selEntregas = new Set();
+function toggleSelEntrega(id){ if(selEntregas.has(id)) selEntregas.delete(id); else selEntregas.add(id); atualizarSelEntregas(); }
+function selecionarDiaEntregas(iso){
+  const ids=entregas.filter(e=>e.dataISO===iso && entregaVisivel(e)).map(e=>e.id);
+  const todas=ids.length && ids.every(i=>selEntregas.has(i));
+  ids.forEach(i=>{ if(todas) selEntregas.delete(i); else selEntregas.add(i); });
+  atualizarSelEntregas();
+}
+function selecionarTodasTabelaEntregas(marcar){
+  document.querySelectorAll('#tbody-entregas input[data-sel-ent]').forEach(c=>{ const id=Number(c.dataset.selEnt); if(marcar) selEntregas.add(id); else selEntregas.delete(id); });
+  atualizarSelEntregas();
+}
+function limparSelEntregas(){ selEntregas.clear(); atualizarSelEntregas(); }
+function atualizarSelEntregas(){
+  // some da selecao o que deixou de existir/ficou invisivel (cancelada etc.)
+  [...selEntregas].forEach(id=>{ const e=entregas.find(x=>x.id===id); if(!e || !entregaVisivel(e)) selEntregas.delete(id); });
+  const barra=document.getElementById('barra-sel-entregas');
+  if(barra){
+    barra.style.display=selEntregas.size?'flex':'none';
+    document.getElementById('sel-entregas-n').textContent=selEntregas.size+' entrega(s) selecionada(s)';
+    const sel=document.getElementById('sel-entregador');
+    if(sel){ const atual=sel.value; sel.innerHTML='<option value="">— Entregador —</option>'+entregadores.map(e=>`<option value="${e.id}">${e.nome}</option>`).join('')+'<option value="__nenhum">Remover entregador</option>'; sel.value=atual; }
+  }
+  document.querySelectorAll('#tbody-entregas input[data-sel-ent]').forEach(c=>{ c.checked=selEntregas.has(Number(c.dataset.selEnt)); });
+  const todas=document.getElementById('sel-todas-entregas');
+  if(todas){ const cbs=[...document.querySelectorAll('#tbody-entregas input[data-sel-ent]')]; todas.checked=cbs.length>0 && cbs.every(c=>c.checked); }
+  renderCalendario();
+}
+// Define o entregador de todas as selecionadas de uma vez (em vez de editar uma a uma)
+async function salvarEntregadorSelecionadas(){
+  const v=document.getElementById('sel-entregador').value;
+  if(!v){ alert('Escolha o entregador na lista.'); return; }
+  const ids=[...selEntregas]; if(!ids.length) return;
+  const entId = v==='__nenhum' ? null : (entregadores.find(x=>x.id==v)||{}).id;
+  if(v!=='__nenhum' && entId===undefined){ alert('Entregador não encontrado.'); return; }
+  const {error}=await sb.from('entregas').update({entregador_id:entId}).in('id',ids);
+  if(error){ alert('Erro ao atribuir o entregador: '+error.message); return; }
+  entregas=entregas.map(e=>ids.includes(e.id)?{...e,entregadorId:entId}:e);
+  renderEntregas(); atualizarSelEntregas();
+}
+function gerarRomaneioSelecionadas(){
+  const lista=entregas.filter(e=>selEntregas.has(e.id) && entregaVisivel(e))
+    .sort((a,b)=>(a.dataISO||'').localeCompare(b.dataISO||'')||String(a.periodo).localeCompare(String(b.periodo)));
+  if(!lista.length){ alert('Selecione ao menos uma entrega.'); return; }
+  const datas=[...new Set(lista.map(e=>e.dataISO))].sort();
+  const titulo = datas.length===1
+    ? new Date(datas[0]+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'})
+    : 'Entregas selecionadas ('+fmtDataBR(datas[0])+' a '+fmtDataBR(datas[datas.length-1])+')';
+  montarRomaneio(lista, titulo, datas.length>1);
+}
 function navSemana(dir){ semanaOffset+=dir; renderCalendario(); }
 function irHoje(){ semanaOffset=0; renderCalendario(); }
 function filtrarDia(diaISO){
   const busca=document.getElementById('busca-entrega'); if(busca) busca.value='';
   const tbody=document.getElementById('tbody-entregas');
   const lista=entregas.filter(e=>e.dataISO===diaISO && entregaVisivel(e)).sort((a,b)=>a.periodo>b.periodo?1:-1);
-  if(!lista.length){ tbody.innerHTML=`<tr><td colspan="12" class="sem-dados">Nenhuma entrega para este dia.</td></tr>`; return; }
+  if(!lista.length){ tbody.innerHTML=`<tr><td colspan="13" class="sem-dados">Nenhuma entrega para este dia.</td></tr>`; return; }
   tbody.innerHTML=lista.map(trEntrega).join('');
 }
 function toggleMotivoReagendamento(){
@@ -3881,6 +3963,10 @@ function gerarRomaneio(){
   const entsDia=entregas.filter(e=>e.dataISO===dataISO && entregaVisivel(e)).sort((a,b)=>a.periodo>b.periodo?1:-1);
   if(!entsDia.length){ alert('Nenhuma entrega nesta data.'); return; }
   const dataFmt=new Date(dataISO+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  montarRomaneio(entsDia, dataFmt, false);
+}
+// Monta e abre o romaneio (agrupado por entregador). multiData=true mostra a data de cada entrega.
+function montarRomaneio(entsDia, dataFmt, multiData){
   const grupos={};
   entsDia.forEach(e=>{ const k=String(e.entregadorId||'sem'); if(!grupos[k]) grupos[k]=[]; grupos[k].push(e); });
   const estilos=`<style>
@@ -3905,7 +3991,7 @@ function gerarRomaneio(){
     const clsSt={agendado:'badge-ag',em_rota:'badge-rt',entregue:'badge-en',reagendado:'badge-re'};
     const linhas=lista.map((e,i)=>{
       const venda=e.vendaId?vendas.find(v=>v.id==e.vendaId):null;
-      return `<tr><td class="num">${i+1}</td><td>${e.periodo}</td>
+      return `<tr><td class="num">${i+1}</td><td>${multiData?`<b>${fmtDataBR(e.dataISO).slice(0,5)}</b><br>`:''}${e.periodo}</td>
         <td><b>${e.cliente}</b>${telDaEntrega(e)?`<br><span style="font-size:12px;font-weight:700">Tel: ${telDaEntrega(e)}</span>`:''}${e.end?`<br><span style="font-size:11px;color:#5A6A8A">${e.end}</span>`:''}${vendedoraDaEntrega(e)?`<br><span style="font-size:11px;color:#5A6A8A">Vendedora: <b>${vendedoraDaEntrega(e)}</b></span>`:''}</td>
         <td style="font-size:12px">${e.itens||'—'}</td>
         <td>${venda?`<b style="color:#1A7A4A">R$ ${Number(venda.total).toLocaleString('pt-BR',{minimumFractionDigits:2})}</b><br><span style="font-size:11px;color:#5A6A8A">${venda.pgto}</span>`:'—'}</td>
@@ -4323,6 +4409,56 @@ function labelPeriodoTexto(){
 }
 
 // ─── EXPORTAR PDF ─────────────────────────────────────────────────────────────
+// Comissao de uma vendedora no periodo: % sobre os pagamentos RECEBIDOS no periodo (pela data do recebimento;
+// vendas antigas sem essa data usam a data da venda). Mesmo criterio do app das vendedoras.
+function comissaoDaVendedora(vend, ini, fim){
+  const lista=vendas.filter(v=>v.vendedoraId==vend.id && v.status!=='cancelado' && v.pgtoRecebido==='sim').filter(v=>{
+    const d=String(v.dataRecebimento||v.dataISO||'').slice(0,10);
+    if(!d) return false;
+    if(ini && d<ini) return false;
+    if(fim && d>fim) return false;
+    return true;
+  }).sort((a,b)=>String(a.dataRecebimento||a.dataISO).localeCompare(String(b.dataRecebimento||b.dataISO)));
+  const base=lista.reduce((a,v)=>a+v.total,0), pct=Number(vend.comissao)||0;
+  return {lista,base,pct,valor:base*pct/100};
+}
+// Valor por extenso em reais (ex.: 1234.5 -> "mil, duzentos e trinta e quatro reais e cinquenta centavos")
+function extensoBR(valor){
+  const un=['zero','um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove'];
+  const dz=['','','vinte','trinta','quarenta','cinquenta','sessenta','setenta','oitenta','noventa'];
+  const ct=['','cento','duzentos','trezentos','quatrocentos','quinhentos','seiscentos','setecentos','oitocentos','novecentos'];
+  const ate999=n=>{
+    if(n===100) return 'cem';
+    const c=Math.floor(n/100), r=n%100, p=[];
+    if(c) p.push(ct[c]);
+    if(r){ if(r<20) p.push(un[r]); else { const d=Math.floor(r/10), u=r%10; p.push(u?dz[d]+' e '+un[u]:dz[d]); } }
+    return p.join(' e ');
+  };
+  const inteiro=n=>{
+    if(n===0) return 'zero';
+    const partes=[];
+    const mi=Math.floor(n/1e6), mil=Math.floor((n%1e6)/1000), r=n%1000;
+    if(mi) partes.push({t:ate999(mi)+(mi===1?' milhão':' milhões'),v:mi*1e6});
+    if(mil) partes.push({t:mil===1?'mil':ate999(mil)+' mil',v:mil*1000});
+    if(r) partes.push({t:ate999(r),v:r});
+    return partes.map((p,i)=>i===0?p.t:((p.v<100||p.v%100===0)?' e ':' ')+p.t).join('');
+  };
+  const total=Math.round((Number(valor)||0)*100);
+  const reais=Math.floor(total/100), cent=total%100;
+  const partes=[];
+  if(reais>0||cent===0) partes.push(inteiro(reais)+((reais>=1e6&&reais%1e6===0)?' de':'')+(reais===1?' real':' reais'));
+  if(cent>0) partes.push(inteiro(cent)+(cent===1?' centavo':' centavos'));
+  return partes.join(' e ');
+}
+function normNome(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim(); }
+// Cadastro de funcionario correspondente (nome completo e chave PIX), casando pelo nome
+function funcionarioDaVendedora(vd){
+  const lista=(funcionarios||[]).filter(f=>/vend/i.test(f.tipo||''));
+  const n=normNome(vd.nome);
+  let f=lista.find(x=>normNome(x.nome)===n) || lista.find(x=>normNome(x.nome).includes(n) || n.includes(normNome(x.nome)));
+  if(!f){ const prim=n.split(' ')[0]; const c=lista.filter(x=>normNome(x.nome).split(' ')[0]===prim); if(c.length===1) f=c[0]; }
+  return f||null;
+}
 // Cidade da venda (sem acento/caixa para agrupar "Goiania" e "goiânia" juntas)
 function cidadeDaVenda(v){
   const c=String(v.endCidade||'').trim().replace(/\s+/g,' ');
@@ -4403,21 +4539,23 @@ function exportarPDF(tipo) {
   }
   function rodape(doc){ rodapePDF(doc); }
 
-  if(tipo==='vendas' || tipo==='completo') {
+  if(tipo==='vendas' || tipo==='vendas_vendedora' || tipo==='completo') {
     if(tipo==='completo') doc.addPage();
-    const vendasFiltradasTodas = filtrarPorPeriodo(vendas, 'dataISO', pIni, pFim);
+    // Relatorio de uma vendedora so: filtra tudo (vendas, graficos, comissao) por ela
+    const filtroVendRel = tipo==='vendas_vendedora' ? (document.getElementById('pdf-vendedora').value||'') : '';
+    if(tipo==='vendas_vendedora' && !filtroVendRel){ alert('Escolha a vendedora.'); return; }
+    const vendRel = filtroVendRel ? vendedoras.find(x=>String(x.id)===filtroVendRel) : null;
+    const vendasFiltradasTodas = filtrarPorPeriodo(vendas, 'dataISO', pIni, pFim).filter(v=>!filtroVendRel||String(v.vendedoraId)===filtroVendRel);
     const vendasFiltradas = vendasFiltradasTodas.filter(v=>v.status!=='cancelado');
     const vendasCanceladas = vendasFiltradasTodas.filter(v=>v.status==='cancelado');
-    let y = cabecalho('Relatório de Vendas', null, [26,122,74]);
+    let y = cabecalho(vendRel?'Relatório de Vendas - '+vendRel.nome:'Relatório de Vendas', vendRel?'Vendedora: '+vendRel.nome+' · comissão '+(Number(vendRel.comissao)||0)+'%':null, [26,122,74]);
     const totalGeral = vendasFiltradas.reduce((a,v)=>a+v.total,0);
     const totalRecebido = vendasFiltradas.filter(v=>v.pgtoRecebido==='sim').reduce((a,v)=>a+v.total,0);
     const totalPendente = totalGeral - totalRecebido;
     const totalCancelado = vendasCanceladas.reduce((a,v)=>a+v.total,0);
-    const totalComissoesGeral = vendedoras.reduce((acc,vend)=>{
-      const lista = vendasFiltradas.filter(v=>v.vendedoraId==vend.id);
-      const recebVend = lista.filter(v=>v.pgtoRecebido==='sim').reduce((a,v)=>a+v.total,0);
-      return acc + recebVend*((vend.comissao||0)/100);
-    },0);
+    // Comissao = % sobre o que foi RECEBIDO no periodo (data do recebimento), igual ao app das vendedoras
+    const totalComissoesGeral = vendedoras.filter(vend=>!filtroVendRel||String(vend.id)===filtroVendRel)
+      .reduce((acc,vend)=>acc+comissaoDaVendedora(vend,pIni,pFim).valor,0);
     doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(30,40,64);
     doc.text('Resumo Geral (vendas ativas — sem cancelados)', 14, y); y+=6;
     doc.autoTable({ startY:y, margin:{left:14,right:14}, head:[['Total de Vendas','Valor Total','Recebido','A Receber','Comissões (total)']],
@@ -4436,21 +4574,23 @@ function exportarPDF(tipo) {
       doc.text('Nenhuma venda encontrada no período selecionado.', 14, y);
     } else {
       const semVendedora = vendasFiltradas.filter(v=>!v.vendedoraId);
-      const grupos = [...vendedoras.map(vend=>({vend,lista:vendasFiltradas.filter(v=>v.vendedoraId==vend.id)})), semVendedora.length?{vend:null,lista:semVendedora}:null].filter(Boolean);
+      const grupos = [...vendedoras.filter(vend=>!filtroVendRel||String(vend.id)===filtroVendRel).map(vend=>({vend,lista:vendasFiltradas.filter(v=>v.vendedoraId==vend.id)})), semVendedora.length?{vend:null,lista:semVendedora}:null].filter(Boolean);
       for(const {vend,lista} of grupos){
-        if(!lista.length) continue;
+        // inclui tambem quem so recebeu no periodo vendas feitas antes (a comissao dela entra no total)
+        if(!lista.length && !(vend && comissaoDaVendedora(vend,pIni,pFim).base>0)) continue;
         if(y > 240){ doc.addPage(); y = 20; }
         const nomeVend = vend?vend.nome:'Sem vendedora';
         const comissaoPct = vend?vend.comissao:0;
         const totalVend = lista.reduce((a,v)=>a+v.total,0);
         const totalRecebVend = lista.filter(v=>v.pgtoRecebido==='sim').reduce((a,v)=>a+v.total,0);
-        const comissaoValor = totalRecebVend*(comissaoPct/100);
+        const comRec = vend ? comissaoDaVendedora(vend,pIni,pFim) : {valor:0,base:0};
+        const comissaoValor = comRec.valor;
         doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(30,77,140);
         doc.text(`Vendedora: ${nomeVend}`, 14, y);
-        if(vend){ doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(90,106,138); doc.text(`Comissão: ${comissaoPct}% | Base: vendas recebidas`, 14, y+5); }
+        if(vend){ doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(90,106,138); doc.text(`Comissão: ${comissaoPct}% | Base: pagamentos recebidos no período (pela data do recebimento)`, 14, y+5); }
         y += vend ? 10 : 7;
         doc.autoTable({ startY:y, margin:{left:14,right:14}, head:[['#','Data','Cliente','Cidade','Itens','Total','Taxa Maq.','Líquido','Pgto','Status']],
-          body:lista.map(v=>{ const temTaxa=(v.taxaPct||0)>0;
+          body:(lista.length?lista:[null]).map(v=>{ if(!v) return ['','','Nenhuma venda feita no período (só recebimentos de vendas anteriores)','','','','','','','']; const temTaxa=(v.taxaPct||0)>0;
             return ['#'+v.id,v.data,v.cliente,cidadeDaVenda(v)==='Não informada'?'—':cidadeDaVenda(v),(v.itens||[]).map(i=>i.qtd+'x '+i.nome).join(', '), fmtR(v.total),
               temTaxa?`${v.taxaPct.toFixed(2).replace('.',',')}%`:'—', temTaxa?fmtR(v.valorLiquido||v.total):'—',
               v.pgtoRecebido==='sim'?'Recebido':'Pendente', v.status.charAt(0).toUpperCase()+v.status.slice(1)]; }),
@@ -4468,7 +4608,7 @@ function exportarPDF(tipo) {
         doc.text(`A receber: ${fmtR(totalVend-totalRecebVend)}`, 140, y+6);
         doc.setTextColor(185,28,28); doc.text(`Total taxas maquininha: -${fmtR(totalTaxas)}`, 16, y+13);
         doc.setTextColor(26,122,74); doc.text(`Liquido total: ${fmtR(totalLiq)}`, 110, y+13);
-        if(vend){ doc.setTextColor(26,122,74); doc.text(`Comissao a pagar: ${fmtR(comissaoValor)} (${comissaoPct}% sobre ${fmtR(totalRecebVend)} recebidos)`, 16, y+19); }
+        if(vend){ doc.setTextColor(26,122,74); doc.text(`Comissao a pagar: ${fmtR(comissaoValor)} (${comissaoPct}% sobre ${fmtR(comRec.base)} recebidos no periodo)`, 16, y+19); }
         y += 28;
       }
       if(vendasCanceladas.length){
@@ -4484,7 +4624,74 @@ function exportarPDF(tipo) {
         y = doc.lastAutoTable.finalY + 6;
       }
     }
-    if(tipo==='vendas'){ rodape(doc); doc.save(`relatorio-vendas-${dataHoje.replace(/\//g,'-')}.pdf`); return; }
+    if(tipo==='vendas' || tipo==='vendas_vendedora'){ rodape(doc); doc.save(`relatorio-vendas${vendRel?'-'+vendRel.nome.toLowerCase().replace(/[^a-z0-9]+/g,'-'):''}-${dataHoje.replace(/\//g,'-')}.pdf`); return; }
+  }
+  if(tipo==='comissoes' || tipo==='comissoes_docs') {
+    // Consolidado de comissoes (base: pagamentos recebidos no periodo) + opcionalmente um documento de prestacao de servicos por vendedora
+    const filtro = document.getElementById('pdf-comissao-vendedora').value||'';
+    const comDocs = tipo==='comissoes_docs';
+    const lblPer = labelPeriodoTexto();
+    const rows = vendedoras.filter(vd=>(!filtro||String(vd.id)===filtro) && Number(vd.comissao)>0).map(vd=>{
+      const c = comissaoDaVendedora(vd,pIni,pFim);
+      const feitas = filtrarPorPeriodo(vendas.filter(v=>v.vendedoraId==vd.id && v.status!=='cancelado'),'dataISO',pIni,pFim);
+      return {vd, c, qtdFeitas:feitas.length, vendido:feitas.reduce((a,v)=>a+v.total,0), aReceber:feitas.filter(v=>v.pgtoRecebido!=='sim').reduce((a,v)=>a+v.total,0)};
+    }).filter(r=>r.qtdFeitas>0 || r.c.base>0).sort((a,b)=>b.c.valor-a.c.valor);
+    if(!rows.length){ alert('Nenhuma comissão encontrada no período selecionado.'); return; }
+    let y = cabecalho('Consolidado de Comissões das Vendedoras', 'Comissão = % sobre os pagamentos RECEBIDOS no período (pela data do recebimento)', [30,77,140]);
+    const totComissao = rows.reduce((a,r)=>a+r.c.valor,0), totBase = rows.reduce((a,r)=>a+r.c.base,0);
+    doc.autoTable({ startY:y, margin:{left:14,right:14},
+      head:[['Vendedora','%','Vendas feitas no período','Vendido','Recebido no período (base)','A receber (do período)','Comissão a pagar']],
+      body: rows.map(r=>[r.vd.nome, (Number(r.vd.comissao)||0)+'%', String(r.qtdFeitas), fmtR(r.vendido), fmtR(r.c.base), fmtR(r.aReceber), {content:fmtR(r.c.valor),styles:{fontStyle:'bold',textColor:[26,122,74]}}]),
+      foot:[['TOTAL','','','', fmtR(totBase),'', fmtR(totComissao)]],
+      styles:{fontSize:8.5,cellPadding:3}, headStyles:{fillColor:[30,77,140],textColor:255,fontStyle:'bold'},
+      footStyles:{fillColor:[240,244,248],textColor:[30,40,64],fontStyle:'bold'}, alternateRowStyles:{fillColor:[248,250,252]} });
+    y = doc.lastAutoTable.finalY + 6;
+    const semData = rows.reduce((a,r)=>a+r.c.lista.filter(v=>!v.dataRecebimento).length,0);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(90,106,138);
+    const obs = doc.splitTextToSize('Período: '+lblPer+'. A comissão é calculada sobre o valor total das vendas cujo pagamento foi marcado como recebido dentro do período, mesmo que a venda tenha sido feita em outro mês. Canceladas não entram.'+(semData?' '+semData+' venda(s) antiga(s) recebida(s) não têm a data do recebimento registrada: nelas foi usada a data da venda.':''), W-28);
+    doc.text(obs, 14, y);
+    if(comDocs){
+      const dataTxt = new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
+      const periodoTxt = (pIni||pFim) ? 'de '+fmtDataBR(pIni||'')+' a '+fmtDataBR(pFim||hojeISO()) : 'todo o período registrado no sistema';
+      rows.filter(r=>r.c.valor>0).forEach(r=>{
+        const f = funcionarioDaVendedora(r.vd);
+        const nomeCompleto = (f&&f.nome)||r.vd.nome;
+        doc.addPage();
+        let yy = cabecalho('Recibo de Comissão - Prestação de Serviços', 'Prestador(a): '+nomeCompleto, [30,77,140]);
+        const par = (txt)=>{ const linhas=doc.splitTextToSize(txt, W-28); doc.text(linhas, 14, yy); yy+=linhas.length*5+3; };
+        doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(30,40,64);
+        par('CONTRATANTE: '+nomeEmpresaPDF()+(empresa.cnpj?', CNPJ '+empresa.cnpj:'')+(empresa.end?', com sede em '+empresa.end:'')+'.');
+        par('PRESTADOR(A): '+nomeCompleto+', CPF nº ______________________________'+(f&&f.chave_pix?', chave PIX '+f.chave_pix:'')+'.');
+        par('Pelo presente recibo, o(a) PRESTADOR(A) declara que prestou à CONTRATANTE, de forma autônoma, serviços de venda e intermediação de produtos no período '+periodoTxt+', tendo sido recebidos pela CONTRATANTE, nesse período, pagamentos no valor total de '+fmtR(r.c.base)+' referentes a '+r.c.lista.length+' venda(s) por ele(a) realizada(s), conforme relação anexa.');
+        par('Pelos serviços prestados, o(a) PRESTADOR(A) faz jus à remuneração de '+r.c.pct+'% (comissão) sobre o valor recebido, no total de '+fmtR(r.c.valor)+' ('+extensoBR(r.c.valor)+'), que declara receber nesta data, dando à CONTRATANTE plena, geral e irrevogável quitação quanto aos serviços e ao período acima descritos, para nada mais reclamar a qualquer título.');
+        yy+=2;
+        doc.autoTable({ startY:yy, margin:{left:14,right:14}, theme:'grid', body:[
+          ['Período', periodoTxt], ['Pagamentos recebidos (base)', fmtR(r.c.base)+' · '+r.c.lista.length+' venda(s)'],
+          ['Percentual de comissão', r.c.pct+'%'], ['Valor da comissão', {content:fmtR(r.c.valor)+'  ('+extensoBR(r.c.valor)+')',styles:{fontStyle:'bold'}}]],
+          styles:{fontSize:9.5,cellPadding:3}, columnStyles:{0:{fontStyle:'bold',fillColor:[240,244,248],cellWidth:56}} });
+        yy = doc.lastAutoTable.finalY + 14;
+        doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(30,40,64);
+        doc.text('Local e data: ______________________, '+dataTxt+'.', 14, yy);
+        yy += 24;
+        doc.setDrawColor(90,106,138); doc.setLineWidth(0.3);
+        doc.line(14, yy, 95, yy); doc.line(115, yy, W-14, yy);
+        doc.setFontSize(8.5); doc.setTextColor(90,106,138);
+        doc.text(doc.splitTextToSize('PRESTADOR(A): '+nomeCompleto, 80), 14, yy+4.5);
+        doc.text(doc.splitTextToSize('CONTRATANTE: '+nomeEmpresaPDF(), 80), 115, yy+4.5);
+        yy += 18;
+        if(yy>230){ doc.addPage(); yy=20; }
+        doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(30,40,64);
+        doc.text('Anexo - vendas que compõem a comissão', 14, yy); yy+=3;
+        doc.autoTable({ startY:yy, margin:{left:14,right:14},
+          head:[['Recebido em','Cliente','Venda de','Valor recebido','Comissão']],
+          body:r.c.lista.map(v=>[fmtDataBR(v.dataRecebimento||v.dataISO), v.cliente, fmtDataBR(v.dataISO), fmtR(v.total), fmtR(v.total*r.c.pct/100)]),
+          foot:[['','','Total',fmtR(r.c.base),fmtR(r.c.valor)]],
+          styles:{fontSize:8.5,cellPadding:2.5}, headStyles:{fillColor:[30,77,140],textColor:255,fontStyle:'bold'},
+          footStyles:{fillColor:[240,244,248],textColor:[30,40,64],fontStyle:'bold'}, alternateRowStyles:{fillColor:[248,250,252]} });
+      });
+    }
+    rodape(doc);
+    doc.save(`${comDocs?'comissoes-prestacao-servico':'comissoes-consolidado'}-${dataHoje.replace(/\//g,'-')}.pdf`); return;
   }
   if(tipo==='estoque') {
     // Estoque simples: so produto e quantidade (sem custo, preco ou margem)
