@@ -4422,11 +4422,17 @@ function labelPeriodoTexto(){
 //  - 'recebimento': pagamentos recebidos no periodo (data do recebimento; sem data usa a da venda).
 function modoComissao(){ return (document.getElementById('pdf-base-comissao')||{}).value||'entrega'; }
 function lblBaseComissao(modo){ return (modo||modoComissao())==='entrega' ? 'vendas entregues no período (com pagamento recebido)' : 'pagamentos recebidos no período'; }
-function dataEntregaVenda(v){
-  const e=entregas.filter(x=>x.vendaId==v.id && x.tipo!=='posvenda' && x.status==='entregue').sort((a,b)=>b.id-a.id)[0];
-  if(e) return String(e.entregueEm||e.dataISO||'').slice(0,10);
-  return v.status==='entregue' ? String(v.previsaoISO||v.dataISO||'').slice(0,10) : '';
+// Data da entrega da venda. Entrega COM baixa = data real. Entrega que ficou so "agendada" (ninguem deu baixa) mas cuja
+// data agendada ja passou e considerada entregue nessa data (presumida=true) - os PDFs marcam essas com * pra conferir.
+function infoEntregaVenda(v){
+  const ents=entregas.filter(x=>x.vendaId==v.id && x.tipo!=='posvenda' && x.status!=='cancelado').sort((a,b)=>b.id-a.id);
+  const feita=ents.find(x=>x.status==='entregue');
+  if(feita) return {data:String(feita.entregueEm||feita.dataISO||'').slice(0,10), presumida:false};
+  if(v.status==='entregue') return {data:String(v.previsaoISO||v.dataISO||'').slice(0,10), presumida:false};
+  if(ents[0] && ents[0].dataISO && ents[0].dataISO<=hojeISO()) return {data:ents[0].dataISO, presumida:true};
+  return {data:'', presumida:false};
 }
+function dataEntregaVenda(v){ return infoEntregaVenda(v).data; }
 function dataBaseComissao(v, modo){ return String((modo||modoComissao())==='entrega' ? dataEntregaVenda(v) : (v.dataRecebimento||v.dataISO||'')).slice(0,10); }
 function comissaoDaVendedora(vend, ini, fim, modo){
   modo=modo||modoComissao();
@@ -4627,6 +4633,8 @@ function exportarPDF(tipo) {
         doc.setTextColor(185,28,28); doc.text(`Total taxas maquininha: -${fmtR(totalTaxas)}`, 16, y+13);
         doc.setTextColor(26,122,74); doc.text(`Liquido total: ${fmtR(totalLiq)}`, 110, y+13);
         if(vend){ doc.setTextColor(26,122,74); doc.text(`Comissao a pagar: ${fmtR(comissaoValor)} (${comissaoPct}% sobre ${fmtR(comRec.base)} da base do periodo)`, 16, y+19); }
+        const nPres = (vend && modoComissao()==='entrega') ? comRec.lista.filter(v=>infoEntregaVenda(v).presumida) : [];
+        if(nPres.length){ doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(90,106,138); doc.text(`* Comissao inclui ${nPres.length} venda(s) so agendadas em Entregas (sem baixa), contadas na data agendada: ${nPres.map(v=>'#'+v.id).join(', ')}`, 16, y+26); y += 5; }
         y += 28;
       }
       if(vendasCanceladas.length){
@@ -4665,6 +4673,7 @@ function exportarPDF(tipo) {
       footStyles:{fillColor:[240,244,248],textColor:[30,40,64],fontStyle:'bold'}, alternateRowStyles:{fillColor:[248,250,252]} });
     y = doc.lastAutoTable.finalY + 6;
     const modoC = modoComissao();
+    const presumidas = modoC==='entrega' ? rows.reduce((a,r)=>a.concat(r.c.lista.filter(v=>infoEntregaVenda(v).presumida)),[]) : [];
     const semData = modoC==='entrega' ? 0 : rows.reduce((a,r)=>a+r.c.lista.filter(v=>!v.dataRecebimento).length,0);
     // entregues no periodo mas ainda sem pagamento recebido: nao entram na comissao ate o pagamento ser marcado
     const entreguesSemPgto = modoC==='entrega' ? vendas.filter(v=>(!filtro||String(v.vendedoraId)===filtro) && v.status!=='cancelado' && v.pgtoRecebido!=='sim' && dataEntregaVenda(v) && (!pIni||dataEntregaVenda(v)>=pIni) && (!pFim||dataEntregaVenda(v)<=pFim) && rows.some(r=>r.vd.id==v.vendedoraId)) : [];
@@ -4673,6 +4682,7 @@ function exportarPDF(tipo) {
       ? 'A comissão é calculada sobre o valor das vendas ENTREGUES dentro do período (data real da entrega) e com pagamento recebido, mesmo que a venda tenha sido feita em outro mês. Canceladas não entram.'
       : 'A comissão é calculada sobre o valor das vendas cujo pagamento foi marcado como recebido dentro do período (data do recebimento), mesmo que a venda tenha sido feita em outro mês. Canceladas não entram.')
       +(semData?' '+semData+' venda(s) antiga(s) recebida(s) não têm a data do recebimento registrada: nelas foi usada a data da venda.':'')
+      +(presumidas.length?' * '+presumidas.length+' venda(s) ('+presumidas.map(v=>'#'+v.id).join(', ')+') estão só "agendadas" em Entregas, sem baixa como Entregue; foram contadas como entregues na data agendada. Confira e dê a baixa para regularizar.':'')
       +(entreguesSemPgto.length?' ATENÇÃO: '+entreguesSemPgto.length+' venda(s) entregue(s) no período ('+fmtR(entreguesSemPgto.reduce((a,v)=>a+v.total,0))+') ainda estão SEM pagamento recebido e por isso não entram na comissão.':''), W-28);
     doc.text(obs, 14, y);
     if(comDocs){
@@ -4709,10 +4719,14 @@ function exportarPDF(tipo) {
         doc.text('Anexo - vendas que compõem a comissão', 14, yy); yy+=3;
         doc.autoTable({ startY:yy, margin:{left:14,right:14},
           head:[[modoC==='entrega'?'Entregue em':'Recebido em','Cliente','Venda de','Valor da venda','Comissão']],
-          body:r.c.lista.map(v=>[fmtDataBR(dataBaseComissao(v,modoC)), v.cliente, fmtDataBR(v.dataISO), fmtR(v.total), fmtR(v.total*r.c.pct/100)]),
+          body:r.c.lista.map(v=>[fmtDataBR(dataBaseComissao(v,modoC))+(modoC==='entrega'&&infoEntregaVenda(v).presumida?' *':''), v.cliente, fmtDataBR(v.dataISO), fmtR(v.total), fmtR(v.total*r.c.pct/100)]),
           foot:[['','','Total',fmtR(r.c.base),fmtR(r.c.valor)]],
           styles:{fontSize:8.5,cellPadding:2.5}, headStyles:{fillColor:[30,77,140],textColor:255,fontStyle:'bold'},
           footStyles:{fillColor:[240,244,248],textColor:[30,40,64],fontStyle:'bold'}, alternateRowStyles:{fillColor:[248,250,252]} });
+        if(modoC==='entrega' && r.c.lista.some(v=>infoEntregaVenda(v).presumida)){
+          doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(90,106,138);
+          doc.text('* Entrega só agendada no sistema (sem baixa como Entregue): considerada entregue na data agendada.', 14, doc.lastAutoTable.finalY+5);
+        }
       });
     }
     rodape(doc);
