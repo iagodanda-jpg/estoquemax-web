@@ -767,6 +767,13 @@
         </div>
         <div id="pdf-periodo-label" style="font-size:13px;color:var(--sub);padding-bottom:6px"></div>
       </div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px;padding-top:12px;border-top:1.5px solid var(--borda)">
+        <label for="pdf-base-comissao" style="font-size:13px;font-weight:700">Comissão contada pela:</label>
+        <select id="pdf-base-comissao" style="border:1.5px solid var(--borda);border-radius:8px;padding:7px 10px;font-size:13px">
+          <option value="entrega">Data da entrega (venda entregue e paga no período)</option>
+          <option value="recebimento">Data do recebimento do pagamento</option>
+        </select>
+      </div>
       <div id="pdf-periodo-resumo" style="margin-top:12px;font-size:12px;color:var(--sub);background:var(--fundo);border-radius:8px;padding:8px 12px;display:none"></div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px">
@@ -784,7 +791,7 @@
       </div>
       <div class="card" style="border-left:5px solid #1E4D8C">
         <div style="font-weight:700;font-size:15px;margin-bottom:4px">Comissões das Vendedoras</div>
-        <div style="color:var(--sub);font-size:13px;margin-bottom:12px">Consolidado de comissões (sobre o que foi <b>recebido</b> no período). Dá para emitir também o recibo de prestação de serviços de cada vendedora, com anexo das vendas e linhas de assinatura.</div>
+        <div style="color:var(--sub);font-size:13px;margin-bottom:12px">Consolidado de comissões das vendas <b>entregues</b> (e pagas) no período — o critério pode ser trocado em "Comissão contada pela", lá em cima. Dá para emitir também o recibo de prestação de serviços de cada vendedora, com anexo das vendas e linhas de assinatura.</div>
         <select id="pdf-comissao-vendedora" style="width:100%;margin-bottom:12px;border:1.5px solid var(--borda);border-radius:8px;padding:8px 10px;font-size:13px"></select>
         <div style="display:flex;flex-wrap:wrap;gap:8px">
           <button class="btn btn-primary" onclick="exportarPDF('comissoes')">Só o consolidado</button>
@@ -4409,16 +4416,27 @@ function labelPeriodoTexto(){
 }
 
 // ─── EXPORTAR PDF ─────────────────────────────────────────────────────────────
-// Comissao de uma vendedora no periodo: % sobre os pagamentos RECEBIDOS no periodo (pela data do recebimento;
-// vendas antigas sem essa data usam a data da venda). Mesmo criterio do app das vendedoras.
-function comissaoDaVendedora(vend, ini, fim){
+// Comissao de uma vendedora no periodo. Dois criterios (escolhidos em Exportar PDF):
+//  - 'entrega' (padrao): vendas ENTREGUES no periodo (data real da entrega) e com pagamento recebido - uma venda de
+//    outubro entregue em novembro entra em novembro;
+//  - 'recebimento': pagamentos recebidos no periodo (data do recebimento; sem data usa a da venda).
+function modoComissao(){ return (document.getElementById('pdf-base-comissao')||{}).value||'entrega'; }
+function lblBaseComissao(modo){ return (modo||modoComissao())==='entrega' ? 'vendas entregues no período (com pagamento recebido)' : 'pagamentos recebidos no período'; }
+function dataEntregaVenda(v){
+  const e=entregas.filter(x=>x.vendaId==v.id && x.tipo!=='posvenda' && x.status==='entregue').sort((a,b)=>b.id-a.id)[0];
+  if(e) return String(e.entregueEm||e.dataISO||'').slice(0,10);
+  return v.status==='entregue' ? String(v.previsaoISO||v.dataISO||'').slice(0,10) : '';
+}
+function dataBaseComissao(v, modo){ return String((modo||modoComissao())==='entrega' ? dataEntregaVenda(v) : (v.dataRecebimento||v.dataISO||'')).slice(0,10); }
+function comissaoDaVendedora(vend, ini, fim, modo){
+  modo=modo||modoComissao();
   const lista=vendas.filter(v=>v.vendedoraId==vend.id && v.status!=='cancelado' && v.pgtoRecebido==='sim').filter(v=>{
-    const d=String(v.dataRecebimento||v.dataISO||'').slice(0,10);
+    const d=dataBaseComissao(v,modo);
     if(!d) return false;
     if(ini && d<ini) return false;
     if(fim && d>fim) return false;
     return true;
-  }).sort((a,b)=>String(a.dataRecebimento||a.dataISO).localeCompare(String(b.dataRecebimento||b.dataISO)));
+  }).sort((a,b)=>dataBaseComissao(a,modo).localeCompare(dataBaseComissao(b,modo)));
   const base=lista.reduce((a,v)=>a+v.total,0), pct=Number(vend.comissao)||0;
   return {lista,base,pct,valor:base*pct/100};
 }
@@ -4587,7 +4605,7 @@ function exportarPDF(tipo) {
         const comissaoValor = comRec.valor;
         doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(30,77,140);
         doc.text(`Vendedora: ${nomeVend}`, 14, y);
-        if(vend){ doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(90,106,138); doc.text(`Comissão: ${comissaoPct}% | Base: pagamentos recebidos no período (pela data do recebimento)`, 14, y+5); }
+        if(vend){ doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(90,106,138); doc.text(`Comissão: ${comissaoPct}% | Base: ${lblBaseComissao()}`, 14, y+5); }
         y += vend ? 10 : 7;
         doc.autoTable({ startY:y, margin:{left:14,right:14}, head:[['#','Data','Cliente','Cidade','Itens','Total','Taxa Maq.','Líquido','Pgto','Status']],
           body:(lista.length?lista:[null]).map(v=>{ if(!v) return ['','','Nenhuma venda feita no período (só recebimentos de vendas anteriores)','','','','','','','']; const temTaxa=(v.taxaPct||0)>0;
@@ -4608,7 +4626,7 @@ function exportarPDF(tipo) {
         doc.text(`A receber: ${fmtR(totalVend-totalRecebVend)}`, 140, y+6);
         doc.setTextColor(185,28,28); doc.text(`Total taxas maquininha: -${fmtR(totalTaxas)}`, 16, y+13);
         doc.setTextColor(26,122,74); doc.text(`Liquido total: ${fmtR(totalLiq)}`, 110, y+13);
-        if(vend){ doc.setTextColor(26,122,74); doc.text(`Comissao a pagar: ${fmtR(comissaoValor)} (${comissaoPct}% sobre ${fmtR(comRec.base)} recebidos no periodo)`, 16, y+19); }
+        if(vend){ doc.setTextColor(26,122,74); doc.text(`Comissao a pagar: ${fmtR(comissaoValor)} (${comissaoPct}% sobre ${fmtR(comRec.base)} da base do periodo)`, 16, y+19); }
         y += 28;
       }
       if(vendasCanceladas.length){
@@ -4637,18 +4655,25 @@ function exportarPDF(tipo) {
       return {vd, c, qtdFeitas:feitas.length, vendido:feitas.reduce((a,v)=>a+v.total,0), aReceber:feitas.filter(v=>v.pgtoRecebido!=='sim').reduce((a,v)=>a+v.total,0)};
     }).filter(r=>r.qtdFeitas>0 || r.c.base>0).sort((a,b)=>b.c.valor-a.c.valor);
     if(!rows.length){ alert('Nenhuma comissão encontrada no período selecionado.'); return; }
-    let y = cabecalho('Consolidado de Comissões das Vendedoras', 'Comissão = % sobre os pagamentos RECEBIDOS no período (pela data do recebimento)', [30,77,140]);
+    let y = cabecalho('Consolidado de Comissões das Vendedoras', 'Comissão = % sobre as '+lblBaseComissao(), [30,77,140]);
     const totComissao = rows.reduce((a,r)=>a+r.c.valor,0), totBase = rows.reduce((a,r)=>a+r.c.base,0);
     doc.autoTable({ startY:y, margin:{left:14,right:14},
-      head:[['Vendedora','%','Vendas feitas no período','Vendido','Recebido no período (base)','A receber (do período)','Comissão a pagar']],
+      head:[['Vendedora','%','Vendas feitas no período','Vendido',modoComissao()==='entrega'?'Base: entregues e pagas no período':'Base: recebido no período','A receber (do período)','Comissão a pagar']],
       body: rows.map(r=>[r.vd.nome, (Number(r.vd.comissao)||0)+'%', String(r.qtdFeitas), fmtR(r.vendido), fmtR(r.c.base), fmtR(r.aReceber), {content:fmtR(r.c.valor),styles:{fontStyle:'bold',textColor:[26,122,74]}}]),
       foot:[['TOTAL','','','', fmtR(totBase),'', fmtR(totComissao)]],
       styles:{fontSize:8.5,cellPadding:3}, headStyles:{fillColor:[30,77,140],textColor:255,fontStyle:'bold'},
       footStyles:{fillColor:[240,244,248],textColor:[30,40,64],fontStyle:'bold'}, alternateRowStyles:{fillColor:[248,250,252]} });
     y = doc.lastAutoTable.finalY + 6;
-    const semData = rows.reduce((a,r)=>a+r.c.lista.filter(v=>!v.dataRecebimento).length,0);
+    const modoC = modoComissao();
+    const semData = modoC==='entrega' ? 0 : rows.reduce((a,r)=>a+r.c.lista.filter(v=>!v.dataRecebimento).length,0);
+    // entregues no periodo mas ainda sem pagamento recebido: nao entram na comissao ate o pagamento ser marcado
+    const entreguesSemPgto = modoC==='entrega' ? vendas.filter(v=>(!filtro||String(v.vendedoraId)===filtro) && v.status!=='cancelado' && v.pgtoRecebido!=='sim' && dataEntregaVenda(v) && (!pIni||dataEntregaVenda(v)>=pIni) && (!pFim||dataEntregaVenda(v)<=pFim) && rows.some(r=>r.vd.id==v.vendedoraId)) : [];
     doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(90,106,138);
-    const obs = doc.splitTextToSize('Período: '+lblPer+'. A comissão é calculada sobre o valor total das vendas cujo pagamento foi marcado como recebido dentro do período, mesmo que a venda tenha sido feita em outro mês. Canceladas não entram.'+(semData?' '+semData+' venda(s) antiga(s) recebida(s) não têm a data do recebimento registrada: nelas foi usada a data da venda.':''), W-28);
+    const obs = doc.splitTextToSize('Período: '+lblPer+'. '+(modoC==='entrega'
+      ? 'A comissão é calculada sobre o valor das vendas ENTREGUES dentro do período (data real da entrega) e com pagamento recebido, mesmo que a venda tenha sido feita em outro mês. Canceladas não entram.'
+      : 'A comissão é calculada sobre o valor das vendas cujo pagamento foi marcado como recebido dentro do período (data do recebimento), mesmo que a venda tenha sido feita em outro mês. Canceladas não entram.')
+      +(semData?' '+semData+' venda(s) antiga(s) recebida(s) não têm a data do recebimento registrada: nelas foi usada a data da venda.':'')
+      +(entreguesSemPgto.length?' ATENÇÃO: '+entreguesSemPgto.length+' venda(s) entregue(s) no período ('+fmtR(entreguesSemPgto.reduce((a,v)=>a+v.total,0))+') ainda estão SEM pagamento recebido e por isso não entram na comissão.':''), W-28);
     doc.text(obs, 14, y);
     if(comDocs){
       const dataTxt = new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
@@ -4662,7 +4687,7 @@ function exportarPDF(tipo) {
         doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(30,40,64);
         par('CONTRATANTE: '+nomeEmpresaPDF()+(empresa.cnpj?', CNPJ '+empresa.cnpj:'')+(empresa.end?', com sede em '+empresa.end:'')+'.');
         par('PRESTADOR(A): '+nomeCompleto+', CPF nº ______________________________'+(f&&f.chave_pix?', chave PIX '+f.chave_pix:'')+'.');
-        par('Pelo presente recibo, o(a) PRESTADOR(A) declara que prestou à CONTRATANTE, de forma autônoma, serviços de venda e intermediação de produtos no período '+periodoTxt+', tendo sido recebidos pela CONTRATANTE, nesse período, pagamentos no valor total de '+fmtR(r.c.base)+' referentes a '+r.c.lista.length+' venda(s) por ele(a) realizada(s), conforme relação anexa.');
+        par('Pelo presente recibo, o(a) PRESTADOR(A) declara que prestou à CONTRATANTE, de forma autônoma, serviços de venda e intermediação de produtos no período '+periodoTxt+', tendo a CONTRATANTE, nesse período, '+(modoC==='entrega'?'entregue e recebido o pagamento de ':'recebido pagamentos de ')+r.c.lista.length+' venda(s) por ele(a) realizada(s), no valor total de '+fmtR(r.c.base)+', conforme relação anexa.');
         par('Pelos serviços prestados, o(a) PRESTADOR(A) faz jus à remuneração de '+r.c.pct+'% (comissão) sobre o valor recebido, no total de '+fmtR(r.c.valor)+' ('+extensoBR(r.c.valor)+'), que declara receber nesta data, dando à CONTRATANTE plena, geral e irrevogável quitação quanto aos serviços e ao período acima descritos, para nada mais reclamar a qualquer título.');
         yy+=2;
         doc.autoTable({ startY:yy, margin:{left:14,right:14}, theme:'grid', body:[
@@ -4683,8 +4708,8 @@ function exportarPDF(tipo) {
         doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(30,40,64);
         doc.text('Anexo - vendas que compõem a comissão', 14, yy); yy+=3;
         doc.autoTable({ startY:yy, margin:{left:14,right:14},
-          head:[['Recebido em','Cliente','Venda de','Valor recebido','Comissão']],
-          body:r.c.lista.map(v=>[fmtDataBR(v.dataRecebimento||v.dataISO), v.cliente, fmtDataBR(v.dataISO), fmtR(v.total), fmtR(v.total*r.c.pct/100)]),
+          head:[[modoC==='entrega'?'Entregue em':'Recebido em','Cliente','Venda de','Valor da venda','Comissão']],
+          body:r.c.lista.map(v=>[fmtDataBR(dataBaseComissao(v,modoC)), v.cliente, fmtDataBR(v.dataISO), fmtR(v.total), fmtR(v.total*r.c.pct/100)]),
           foot:[['','','Total',fmtR(r.c.base),fmtR(r.c.valor)]],
           styles:{fontSize:8.5,cellPadding:2.5}, headStyles:{fillColor:[30,77,140],textColor:255,fontStyle:'bold'},
           footStyles:{fillColor:[240,244,248],textColor:[30,40,64],fontStyle:'bold'}, alternateRowStyles:{fillColor:[248,250,252]} });
