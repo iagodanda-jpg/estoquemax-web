@@ -3093,7 +3093,7 @@ async function salvarPosVenda(){
   if(statusPV==='aguardando_retirada' && !retiradaData){ alert('Informe o dia agendado para a retirada da peça.'); return; }
   if(statusPV==='retirado' && !retiradoEm) retiradoEm=hojeISO();
   if(statusPV==='concluido' && !devolvidoEm) devolvidoEm=hojeISO();
-  if(devolvidoEm && devolvidoEm>hojeISO()){ alert('A data da devolução não pode ser no futuro.'); return; }
+  if(devolvidoEm && devolvidoEm>hojeISO()){ alert('A data da devolução ('+fmtDataBR(devolvidoEm)+') é depois de hoje ('+fmtDataBR(hojeISO())+'), por isso não foi aceita.\n\nConfira o ano digitado no campo "Devolvido ao cliente em" e o relógio/data do computador.'); return; }
   if(devolvidoEm && retiradoEm && devolvidoEm<retiradoEm){ alert('A devolução não pode ser antes da retirada.'); return; }
   if(retiradoEm) prazoPV=somarDiasISO(retiradoEm, PRAZO_POSVENDA_DIAS); // prazo travado: sempre retirada + 25 dias
   const obj={
@@ -3746,7 +3746,7 @@ function pedirDataRecebimento(sugestaoISO, opts){
 function confirmarDataRecebimento(){
   const v=document.getElementById('dr-data').value;
   if(!v){ alert('Informe a data.'); return; }
-  if(v>hojeISO() && !window.__drFuturo){ alert('A data não pode ser no futuro.'); return; }
+  if(v>hojeISO() && !window.__drFuturo){ alert('A data escolhida ('+fmtDataBR(v)+') é depois de hoje ('+fmtDataBR(hojeISO())+'), por isso não foi aceita.\n\nConfira o ano digitado e o relógio/data do computador.'); return; }
   fecharModal('data-recebimento'); if(window.__drResolve) window.__drResolve(v);
 }
 function cancelarDataRecebimento(){ fecharModal('data-recebimento'); if(window.__drResolve) window.__drResolve(null); }
