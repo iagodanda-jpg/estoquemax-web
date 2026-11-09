@@ -1063,6 +1063,7 @@ async function cPVH(){
       <div style="font-size:12.5px;color:var(--sub);margin-bottom:6px">${p.tipo_conserto}
         ${(p.retirado_em||p.retirada_data)?`<div>Retirada: <b>${fdBR(p.retirado_em||p.retirada_data)}</b>${p.retirado_em?' ✔':' (agendada)'}</div>`:''}
         ${p.prazo?`<div>Devolver até: <b>${fdBR(p.prazo)}</b></div>`:''}
+        ${p.devolucao_data&&p.status!=='concluido'?`<div>Devolução ao cliente: <b>${fdBR(p.devolucao_data)}</b></div>`:''}
         ${situacaoPV(p)?`<div style="margin-top:2px;font-size:12.5px">${situacaoPV(p)}</div>`:''}
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center">
@@ -1152,7 +1153,7 @@ async function salvarPosVendaVend(){
     const {error:entErr}=await sb.from('entregas').insert({
       cliente:data.cliente, end_completo:data.endereco||'', itens:rotulo+data.tipo_conserto+(data.produto_nome?' — '+data.produto_nome:''),
       entregador_id:null, data_entrega:dataCal, periodo:'Manhã', status:'agendado',
-      obs:data.obs, venda_id:null, tipo:'posvenda', pos_venda_id:data.id
+      obs:data.obs, venda_id:null, tipo:'posvenda', pos_venda_id:data.id, etapa: data.retirada_data ? 'retirada' : 'devolucao'
     }).select().single();
     if(!entErr) entregasVend.push({data_entrega:dataCal});
     else alert('O pós-venda foi registrado, mas a data NÃO entrou no calendário ('+entErr.message+'). Avise o administrador.');
