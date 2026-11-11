@@ -233,9 +233,15 @@
           </div>
         </div>
         <div class="fi"><label>Nome do Produto (se não estiver na lista)</label><input id="pvv-produto-nome" placeholder="Nome do produto"></div>
-        <div class="fi"><label>Tipo de Conserto / Serviço</label><input id="pvv-tipo" placeholder="Ex: Troca de espuma, ajuste de pé..."></div>
-        <div class="fi"><label>Retirada da peça agendada para</label><input id="pvv-retirada" type="date"></div>
-        <div style="font-size:11.5px;color:var(--sub);margin:-6px 0 12px">Dia combinado com o cliente para retirar a peça. Depois da retirada, a loja tem <b>25 dias</b> para devolver o produto finalizado (o prazo é calculado quando a peça for retirada).</div>
+        <div class="fi"><label>Tipo de pós-venda</label>
+          <select id="pvv-modalidade" onchange="pvvAplicarModalidade()">
+            <option value="retirada_devolucao">Retirada da peça + devolução ao cliente (conserto)</option>
+            <option value="entrega">Somente entrega (ex.: brinde esquecido, peça de reposição)</option>
+          </select></div>
+        <div class="fi"><label>Tipo de Conserto / Serviço</label><input id="pvv-tipo" placeholder="Ex: Troca de espuma, ajuste de pé... ou: Entrega do brinde"></div>
+        <div id="pvv-bloco-entrega" style="display:none"><div class="fi"><label>Data da entrega</label><input id="pvv-entrega-data" type="date"></div></div>
+        <div id="pvv-bloco-retirada"><div class="fi"><label>Retirada da peça agendada para</label><input id="pvv-retirada" type="date"></div>
+        <div style="font-size:11.5px;color:var(--sub);margin:-6px 0 12px">Dia combinado com o cliente para retirar a peça. Depois da retirada, a loja tem <b>25 dias</b> para devolver o produto finalizado (o prazo é calculado quando a peça for retirada).</div></div>
         <div class="fi"><label>Custo (R$)</label><input id="pvv-custo" type="number" min="0" step="0.01"></div>
         <div class="fi"><label>Observações</label><input id="pvv-obs" placeholder="Detalhes adicionais..."></div>
         <button class="bt bs" onclick="salvarPosVendaVend()" id="pvv-btn" style="margin-bottom:0">Registrar Pós-venda</button>
@@ -1026,6 +1032,13 @@ const LBL_POSVENDA_V = { aguardando_retirada:'Aguardando retirada', retirado:'Re
 const CL_POSVENDA_V = { aguardando_retirada:'#DBEAFE', retirado:'#FDE68A', aberto:'#FEF9C3', em_andamento:'#DBEAFE', aguardando_peca:'#FDE68A', concluido:'#DCFCE7' };
 // Contagem de dias da etapa em andamento (retirada agendada ou prazo de devolucao)
 function situacaoPV(p){
+  if(p.modalidade==='entrega'){
+    const dias=(a,b)=>Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/864e5);
+    if(p.status==='concluido') return p.devolvido_em ? `<span style="color:#1A7A4A;font-weight:700">entregue em ${fdBR(p.devolvido_em)}</span>` : '';
+    if(!p.prazo) return '';
+    const d=dias(hojeISO(),p.prazo);
+    return d<0?`<span style="color:#B91C1C;font-weight:700">entrega atrasada ${-d} dia(s)</span>`:d===0?`<span style="color:#B45309;font-weight:700">entregar HOJE</span>`:`<span style="color:#1E4D8C;font-weight:700">entrega em ${d} dia(s)</span>`;
+  }
   if(p.status==='concluido'){
     if(!p.devolvido_em) return '';
     const atraso = p.prazo ? Math.round((new Date(p.devolvido_em+'T12:00:00')-new Date(p.prazo+'T12:00:00'))/864e5) : 0;
@@ -1061,13 +1074,14 @@ async function cPVH(){
         <div><b>${p.cliente}</b><div style="font-size:11px;color:var(--sub)">${p.produto_nome||''}${p.venda_id?' · Venda #'+p.venda_id:''}</div></div>
       </div>
       <div style="font-size:12.5px;color:var(--sub);margin-bottom:6px">${p.tipo_conserto}
+        ${p.modalidade==='entrega'?`<div>Entrega: <b>${p.prazo?fdBR(p.prazo):'—'}</b> · só entrega</div>`:''}
         ${(p.retirado_em||p.retirada_data)?`<div>Retirada: <b>${fdBR(p.retirado_em||p.retirada_data)}</b>${p.retirado_em?' ✔':' (agendada)'}</div>`:''}
-        ${p.prazo?`<div>Devolver até: <b>${fdBR(p.prazo)}</b></div>`:''}
+        ${p.prazo&&p.modalidade!=='entrega'?`<div>Devolver até: <b>${fdBR(p.prazo)}</b></div>`:''}
         ${p.devolucao_data&&p.status!=='concluido'?`<div>Devolução ao cliente: <b>${fdBR(p.devolucao_data)}</b></div>`:''}
         ${situacaoPV(p)?`<div style="margin-top:2px;font-size:12.5px">${situacaoPV(p)}</div>`:''}
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <span class="badge" style="background:${CL_POSVENDA_V[p.status]||'#DBEAFE'}">${LBL_POSVENDA_V[p.status]||p.status}</span>
+        <span class="badge" style="background:${CL_POSVENDA_V[p.status]||'#DBEAFE'}">${p.modalidade==='entrega'&&p.status==='aberto'?'Aguardando entrega':(p.modalidade==='entrega'&&p.status==='concluido'?'Entregue':(LBL_POSVENDA_V[p.status]||p.status))}</span>
         <button onclick="baixarPosVendaPDF(${p.id})" style="background:#EFF6FF;border:1px solid #BFDBFE;color:#1E4D8C;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer">📄 Documento</button>
       </div>
     </div>`).join('') : '<div style="text-align:center;color:var(--sub);padding:30px">Nenhum registro ainda</div>';
@@ -1125,10 +1139,18 @@ function selecionarProdutoPV(id){
 function fecharSugPV(tipo){
   setTimeout(()=>{ const box=document.getElementById('sug-pv-'+tipo); if(box) box.style.display='none'; }, 150);
 }
+function pvvAplicarModalidade(){
+  const ent=document.getElementById('pvv-modalidade').value==='entrega';
+  document.getElementById('pvv-bloco-retirada').style.display=ent?'none':'block';
+  document.getElementById('pvv-bloco-entrega').style.display=ent?'block':'none';
+}
 async function salvarPosVendaVend(){
   const cliente=document.getElementById('pvv-cliente').value.trim();
   const tipoConserto=document.getElementById('pvv-tipo').value.trim();
   if(!cliente||!tipoConserto) return alert('Informe o cliente e o tipo de conserto.');
+  const modalidade=document.getElementById('pvv-modalidade').value;
+  const dataEntregaSo=document.getElementById('pvv-entrega-data').value||null;
+  if(modalidade==='entrega' && !dataEntregaSo) return alert('Informe a data da entrega.');
   const btn=document.getElementById('pvv-btn'); btn.textContent='...'; btn.disabled=true;
   const obj={
     venda_id: document.getElementById('pvv-venda').value||null, cliente,
@@ -1136,11 +1158,12 @@ async function salvarPosVendaVend(){
     endereco: document.getElementById('pvv-endereco').value,
     produto_id: document.getElementById('pvv-produto').value||null,
     produto_nome: document.getElementById('pvv-produto-nome').value.trim(),
-    tipo_conserto: tipoConserto, prazo: null,
-    retirada_data: document.getElementById('pvv-retirada').value||null,
+    tipo_conserto: tipoConserto, modalidade,
+    prazo: modalidade==='entrega' ? dataEntregaSo : null,
+    retirada_data: modalidade==='entrega' ? null : (document.getElementById('pvv-retirada').value||null),
     custo: Number(document.getElementById('pvv-custo').value)||0,
     vendedora_id: vid||null, vendedora_nome: vnome||null,
-    status: document.getElementById('pvv-retirada').value ? 'aguardando_retirada' : 'aberto', obs: document.getElementById('pvv-obs').value,
+    status: (modalidade!=='entrega' && document.getElementById('pvv-retirada').value) ? 'aguardando_retirada' : 'aberto', obs: document.getElementById('pvv-obs').value,
     perfil_id: pid
   };
   const {data,error}=await sb.from('pos_vendas').insert(obj).select().single();
@@ -1149,16 +1172,17 @@ async function salvarPosVendaVend(){
   // calendario: a retirada agendada tem prioridade (depois, o Master troca para a devolucao); sem retirada usa o prazo
   const dataCal = data.retirada_data || data.prazo;
   if(dataCal){
-    const rotulo = data.retirada_data ? 'RETIRADA (pós-venda): ' : 'Pós-venda: ';
+    const rotulo = data.modalidade==='entrega' ? 'ENTREGA (pós-venda): ' : (data.retirada_data ? 'RETIRADA (pós-venda): ' : 'Pós-venda: ');
     const {error:entErr}=await sb.from('entregas').insert({
       cliente:data.cliente, end_completo:data.endereco||'', itens:rotulo+data.tipo_conserto+(data.produto_nome?' — '+data.produto_nome:''),
       entregador_id:null, data_entrega:dataCal, periodo:'Manhã', status:'agendado',
-      obs:data.obs, venda_id:null, tipo:'posvenda', pos_venda_id:data.id, etapa: data.retirada_data ? 'retirada' : 'devolucao'
+      obs:data.obs, venda_id:null, tipo:'posvenda', pos_venda_id:data.id, etapa: data.modalidade==='entrega' ? 'entrega' : (data.retirada_data ? 'retirada' : 'devolucao')
     }).select().single();
     if(!entErr) entregasVend.push({data_entrega:dataCal});
     else alert('O pós-venda foi registrado, mas a data NÃO entrou no calendário ('+entErr.message+'). Avise o administrador.');
   }
-  ['pvv-cliente','pvv-tel','pvv-endereco','pvv-produto-nome','pvv-tipo','pvv-retirada','pvv-custo','pvv-obs','pvv-venda-busca','pvv-produto-busca'].forEach(id=>document.getElementById(id).value='');
+  ['pvv-cliente','pvv-tel','pvv-endereco','pvv-produto-nome','pvv-tipo','pvv-retirada','pvv-entrega-data','pvv-custo','pvv-obs','pvv-venda-busca','pvv-produto-busca'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pvv-modalidade').value='retirada_devolucao'; pvvAplicarModalidade();
   document.getElementById('pvv-venda').value='';
   document.getElementById('pvv-produto').value='';
   pvView('hist');
@@ -1195,9 +1219,12 @@ async function gerarPosVendaPDF(pv){
   if(pv.endereco){ doc.text('Endereço: '+pv.endereco, 14, y); y+=6; }
   if(pv.produto_nome){ doc.text('Produto: '+pv.produto_nome, 14, y); y+=6; }
   doc.text('Serviço: '+pv.tipo_conserto, 14, y); y+=6;
+  if(pv.modalidade==='entrega'){ if(pv.prazo){ doc.text('Entrega prevista para: '+fdBR(pv.prazo), 14, y); y+=6; } }
+  else {
   if(pv.retirado_em){ doc.text('Peça retirada em: '+fdBR(pv.retirado_em), 14, y); y+=6; }
   else if(pv.retirada_data){ doc.text('Retirada agendada para: '+fdBR(pv.retirada_data), 14, y); y+=6; }
   if(pv.prazo){ doc.text('Devolução prevista até: '+fdBR(pv.prazo)+(pv.retirado_em?' (25 dias após a retirada)':''), 14, y); y+=6; }
+  }
   doc.text('Vendedor(a) responsável: '+(pv.vendedora_nome||vnome||'-'), 14, y); y+=6;
   if(pv.obs){ doc.text('Observações: '+pv.obs, 14, y); y+=6; }
   y+=10;
