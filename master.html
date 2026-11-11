@@ -3318,6 +3318,8 @@ async function mudarStatusPosVenda(id,status){
     if(!d){ renderPosVendas(); return; }
     patch.retirada_data=d;
   }
+  // passar para uma etapa de retirada significa que e um conserto (retirada + devolucao), nao "so entrega"
+  if((status==='retirado' || status==='aguardando_retirada') && pv.modalidade!=='retirada_devolucao') patch.modalidade='retirada_devolucao';
   const {error}=await sb.from('pos_vendas').update(patch).eq('id',id);
   if(error){ alert('Erro: '+error.message); renderPosVendas(); return; }
   const novo={...pv,...patch};
@@ -3938,6 +3940,11 @@ function telDaEntrega(e){
   return '';
 }
 // Nome da vendedora: da venda vinculada ou do pos-venda vinculado
+function vendedoraIdDaEntrega(e){
+  if(e.vendaId){ const v=vendas.find(x=>x.id==e.vendaId); if(v && v.vendedoraId) return v.vendedoraId; }
+  if(e.posVendaId){ const p=posVendas.find(x=>x.id==e.posVendaId); if(p && p.vendedora_id) return p.vendedora_id; }
+  return null;
+}
 function vendedoraDaEntrega(e){
   if(e.vendaId){ const v=vendas.find(x=>x.id==e.vendaId); const vd=v&&v.vendedoraId?vendedoras.find(x=>x.id==v.vendedoraId):null; if(vd) return vd.nome; }
   if(e.posVendaId){ const p=posVendas.find(x=>x.id==e.posVendaId); if(p && p.vendedora_nome) return p.vendedora_nome; }
@@ -3947,7 +3954,8 @@ const LBL_STATUS_ENTREGA={agendado:'Agendado',em_rota:'Em Rota',entregue:'Entreg
 function trEntrega(e){
   const ent=entregadores.find(x=>x.id==e.entregadorId);
   const vendaLig=e.vendaId?vendas.find(v=>v.id==e.vendaId):null;
-  const vend=vendaLig?.vendedoraId?vendedoras.find(x=>x.id==vendaLig.vendedoraId):null;
+  const nomeVend=vendedoraDaEntrega(e);
+  const vend=nomeVend?{nome:nomeVend}:null;
   const posv=e.tipo==='posvenda';
   return `<tr${posv?' style="background:#F5F3FF"':''}>
     <td><input type="checkbox" data-sel-ent="${e.id}"${selEntregas.has(e.id)?' checked':''} onchange="toggleSelEntrega(${e.id})"></td>
@@ -3978,7 +3986,7 @@ function renderEntregas(){
     const ms=filtroSt==='todos'||e.status===filtroSt;
     const me=filtroEnt==='todos'||String(e.entregadorId)===filtroEnt;
     const vendaLig=e.vendaId?vendas.find(v=>v.id==e.vendaId):null;
-    const mv=filtroVend==='todas'||String(vendaLig?.vendedoraId||'')===filtroVend;
+    const mv=filtroVend==='todas'||String(vendedoraIdDaEntrega(e)||'')===filtroVend;
     return mb&&ms&&me&&mv;
   });
   if(sortEntregas.col){
@@ -3990,9 +3998,8 @@ function renderEntregas(){
       else if(col==='periodo'){ va=a.periodo||''; vb=b.periodo||''; }
       else if(col==='cliente'){ va=(a.cliente||'').toLowerCase(); vb=(b.cliente||'').toLowerCase(); }
       else if(col==='vendedora'){
-        const vA=a.vendaId?vendas.find(v=>v.id==a.vendaId):null, vB=b.vendaId?vendas.find(v=>v.id==b.vendaId):null;
-        va=(vA?.vendedoraId?vendedoras.find(x=>x.id==vA.vendedoraId)?.nome:'')||'';
-        vb=(vB?.vendedoraId?vendedoras.find(x=>x.id==vB.vendedoraId)?.nome:'')||'';
+        va=vendedoraDaEntrega(a)||'';
+        vb=vendedoraDaEntrega(b)||'';
         va=va.toLowerCase(); vb=vb.toLowerCase();
       }
       else if(col==='entregador'){ va=(entregadores.find(x=>x.id==a.entregadorId)?.nome||'').toLowerCase(); vb=(entregadores.find(x=>x.id==b.entregadorId)?.nome||'').toLowerCase(); }
